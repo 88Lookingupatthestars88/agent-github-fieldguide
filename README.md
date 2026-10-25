@@ -1,33 +1,56 @@
 # agent-github-fieldguide
 
-Two skills that go into an agent's skills folder.
+Two skills for agents that work with GitHub. Take one, or both.
 
-**[Download v1.0.0](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/latest)** — unzip, and you get `github-onboard/` and `github-operate/`. Copy each into your client's skills directory.
+## Download
 
-## github-onboard — get the agent into your repositories
+Three files, pick what you need:
 
-Ends the moment the agent can actually read a repository.
+- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-onboard-SKILL.md) — 14 KB
+- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-operate-SKILL.md) — 18 KB
+- [both, as one zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/agent-github-fieldguide-v1.0.0.zip) — 19 KB
 
-- No account: sign up in the browser. The skill points at the page and tells you what to do when a field rejects you, without reciting password rules that change.
-- Has an account: sign in, then confirm it worked by loading the profile settings page.
-- Works out whether your client can do OAuth at all. First-party IDEs ship a registered GitHub app; a generic MCP connector does not, and no amount of retrying fixes that.
-- If OAuth is out, walks through a fine-grained token: which permission for which task, and which five things a fine-grained token can never do.
-- Connects over one of three transports: MCP with OAuth, MCP with a token in a header, or plain REST.
-- Finishes by reading a real repository. A token that was never used proves nothing.
+Each single file is the `SKILL.md` of one skill. Put it in a folder named after the skill and rename it:
 
-## github-operate — keep the agent from breaking things
+```
+<skills dir>/github-onboard/SKILL.md
+<skills dir>/github-operate/SKILL.md
+```
 
-Covers everything after the credential works.
+The folder name has to match the `name:` line at the top of the file. A client that finds `github-onboard/SKILL.md` inside a folder called `onboard` will reject it.
 
-- Reading: list repositories, walk a directory tree, fetch a file. Large files go through the raw media type; the JSON form stops at 1 MB.
-- Writing one file: reads the current `sha` first, because updating without it returns 409 and inventing one returns 422.
-- Writing many files: one atomic commit through the Git Data API, with a refusal if someone else pushed first.
-- Branches, pull requests, issues, workflow runs, releases. Includes what each merge method leaves behind, since none of them can be undone afterwards.
-- Deletion: lists what would go, states what is not on the list, waits for an explicit yes, then removes one item at a time. A repository, a branch, a file and a local directory are separate confirmations, because the failures are not the same size.
+The zip already has the folder structure, so unzipping into your skills directory needs no renaming.
 
-## Where one stops and the other starts
+You can also open either file in the repository and use the download icon on the right. Same file.
 
-`github-onboard` hands over once a repository read succeeds. `github-operate` never re-explains credentials; `github-onboard` never explains operations. Install one if that is all you need.
+## github-onboard
+
+For when the agent has no working way into GitHub yet. It runs until the agent has read one of your repositories, and then it stops.
+
+- No account: points you at the signup page, then reads the error back to you when a field gets rejected. It does not recite password rules; those change.
+- Has an account: sign in, then load the profile settings page. That page loading is the proof, not the sign-in form disappearing.
+- Works out whether your client can finish OAuth. Desktop IDEs ship a registered GitHub app. Most generic MCP connectors do not, and retrying never adds one.
+- When OAuth is not on the table, builds a fine-grained token: which permission to tick for the task in front of you, and the five things a fine-grained token cannot do no matter what you tick.
+- Connects through one of three transports: MCP with OAuth, MCP with a token in a header, plain REST.
+- Reads a real repository at the end. Nothing counts as done before that.
+
+## github-operate
+
+For once the agent can read a repository and you want it to change something.
+
+- Reads: repository list, file tree, file contents. Anything over 1 MB needs the raw media type; the JSON form stops there.
+- Writes one file, reading the current `sha` first. An update without it returns 409, a made-up one returns 422.
+- Writes several files as one commit through the Git Data API, and refuses if the branch moved while it was working.
+- Branches, pull requests, issues, workflow runs, releases. Tells you what each merge method leaves behind before you pick one.
+- Deletes. Lists every item that would go, says what the list does not cover, waits for an explicit yes, then removes one item. A repository, a branch, a file and a local directory are four separate confirmations, because they are not the same size of mistake.
+
+## The two together
+
+`github-onboard` stops at the first successful repository read. `github-operate` picks up the next request.
+
+First run after installing: the agent asks which repository. After that it works from what you ask for.
+
+Install one if that is all you need. They do not depend on each other.
 
 ## Why the credential part is worth reading
 
@@ -37,7 +60,7 @@ The GitHub MCP endpoint returns four different answers depending on what arrived
 
 No Authorization header reached the server.
 
-Most often the client is trying to do OAuth. GitHub does not implement dynamic client registration, so the client cannot register itself, gets no token, and sends the request without a header. A new token will not help here, since no token took part in the request. Put a PAT in the header instead:
+Most often the client is trying to do OAuth. GitHub does not implement dynamic client registration, so the client cannot register itself, gets no token, and sends the request without a header. A new token will not help, since no token took part in that request. Put a PAT in the header instead:
 
 ```json
 { "Authorization": "Bearer github_pat_xxx" }
@@ -45,21 +68,21 @@ Most often the client is trying to do OAuth. GitHub does not implement dynamic c
 
 ### 401 unauthorized: token authentication failed
 
-The token arrived and the server rejected it. Expired, revoked, or of a type this endpoint does not accept.
+The token arrived and the server rejected it. Expired, revoked, or a type this endpoint does not accept.
 
 Check the expiry date and permissions, then issue a new token.
 
 ### 400 bad request: Authorization header is badly formatted
 
-The header is present but its value is malformed: `Bearer` with an empty value, or a scheme other than Bearer.
+The header is present and its value is malformed. `Bearer` with nothing after it, or a scheme other than Bearer.
 
-In this case the token may be valid and the header around it is not.
+The token itself may be fine. What surrounds it is not.
 
 ### 200 with mcp-session-id
 
-The connection worked. The response carries a `mcp-session-id` header and `serverInfo` in the body. A client that shows success without those two is showing its own state, not the server's.
+The connection worked. The response carries an `mcp-session-id` header and `serverInfo` in the body. A client that reports success without both is reporting its own state.
 
-## Install
+## Install from source
 
 ```sh
 git clone https://github.com/88Lookingupatthestars88/agent-github-fieldguide
@@ -67,7 +90,7 @@ cp -r agent-github-fieldguide/github-onboard ~/.claude/skills/
 cp -r agent-github-fieldguide/github-operate ~/.claude/skills/
 ```
 
-Replace `~/.claude/skills/` with your client's skills directory. If the client has no skills support, paste SKILL.md into the system prompt.
+Replace `~/.claude/skills/` with your client's skills directory. A client with no skills support can take SKILL.md pasted into the system prompt.
 
 ## License
 
