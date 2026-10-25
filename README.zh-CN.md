@@ -92,6 +92,12 @@ cp -r agent-github-fieldguide/github-operate ~/.claude/skills/
 
 `~/.claude/skills/` 换成你客户端实际的 skills 目录。不支持 skill 的客户端，把 SKILL.md 粘进系统提示也能用。
 
+## 反馈
+
+Issues 开着。哪个步骤和你看到的不一样，说清是哪一步、实际返回了什么。返回的原文比描述它有用得多。
+
+没有人保证会回复。两个文件，一个人。
+
 ## 许可
 
 Apache-2.0，见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。与 GitHub, Inc. 无关联，未获其背书。

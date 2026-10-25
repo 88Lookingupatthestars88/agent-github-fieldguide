@@ -92,6 +92,12 @@ cp -r agent-github-fieldguide/github-operate ~/.claude/skills/
 
 Replace `~/.claude/skills/` with your client's skills directory. A client with no skills support can take SKILL.md pasted into the system prompt.
 
+## Feedback
+
+Issues are open. If a step in either skill did not match what you saw, say which step and what came back instead. The exact response text matters more than a description of it.
+
+There is no support promise attached to this. It is two files and one person.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). Not affiliated with or endorsed by GitHub, Inc.
