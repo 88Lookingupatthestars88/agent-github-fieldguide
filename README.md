@@ -94,9 +94,9 @@ Replace `~/.claude/skills/` with your client's skills directory. A client with n
 
 ## Feedback
 
-Issues are open. If a step in either skill did not match what you saw, say which step and what came back instead. The exact response text matters more than a description of it.
+Issues are open. If a step did not match what you saw, say which step it was and paste what came back instead. The exact text shows which of the four causes it was.
 
-There is no support promise attached to this. It is two files and one person.
+Replies are not guaranteed.
 
 ## License
 

@@ -126,6 +126,12 @@ JSON
 
 A tree entry with `"sha": null` deletes that path. A path left out of `tree` is unchanged; the new tree is `base_tree` plus the entries listed.
 
+That last sentence holds only because `base_tree` is in the request. Omit `base_tree` and the call means the opposite thing: the tree becomes exactly what you listed, and every other path in the repository is deleted. The call still returns 201, and the response lists only the entries you sent, so nothing in it marks the ones that went away.
+
+Send `base_tree` on every call meant to modify an existing repository, and count the result after any tree write: `GET /git/trees/<new>?recursive=1` should show the previous blob count plus the paths you added, minus the paths you deleted. A count taken from the request you sent is not a check.
+
+When one change has to move both a branch and a tag, move the branch first and confirm it before touching the tag. A tag moved first stays on the new commit even if the branch move is rejected, and it then points at a commit that no branch reaches. `PATCH /git/refs/tags/<tag>` takes `force: true`, so nothing rejects that mistake.
+
 `force: false` makes step 4 fail when someone pushed first. With `true` the move overwrites their commit and the API still reports success.
 
 `git/ref/heads/<branch>` returns a commit SHA. Feeding it to `base_tree` returns 422; the tree SHA comes from the second read.
@@ -283,7 +289,10 @@ Read the status code first; the body is often generic.
 - `404` on an object that exists in a browser — the credential lacks access. GitHub answers 404 instead of 403 on purpose. Recheck repository selection before telling anyone the object is gone.
 - `409` on a contents write — `sha` missing for an update, or stale because the file changed since you read it. Re-read and retry once.
 - `422` on a ref, tree or commit — malformed input: `ref` without `refs/`, a tree entry without `mode`, a `base_tree` that is a commit SHA, or a parent that is not a commit.
+- `422` `Update is not a fast forward` on a ref move — the branch moved after you read its head. Re-read the head, rebuild the tree and the commit on top of it, and move again. Setting `force: true` skips the check and drops whatever arrived in between.
 - `5xx` — server side. Four attempts with backoff, then report the failure with the request that produced it.
+
+A timeout is not a failed request. The work may have completed after the connection dropped, and repeating it then builds a second commit on a parent that is no longer the head. Before repeating any write, read what the write was meant to change — `GET /git/ref/heads/<branch>`, compared against the head you started from. If it moved, the write landed. Report it as done and do not retry.
 
 After two failures of the same call, stop varying parameters. Read the body once and match it against this list.
 
