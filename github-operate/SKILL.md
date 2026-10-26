@@ -4,7 +4,7 @@ description: Does the work once the agent can already read a repository. Use whe
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.5"
+  version: "1.6"
 ---
 
 # GitHub Operations

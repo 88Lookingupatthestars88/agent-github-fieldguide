@@ -4,7 +4,7 @@ description: Gets a user onto GitHub and leaves the agent holding a credential i
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.4"
+  version: "1.5"
 ---
 
 # GitHub Onboarding
