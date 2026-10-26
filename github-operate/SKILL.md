@@ -4,7 +4,7 @@ description: Does the work once the agent can already read a repository. Use whe
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.1"
+  version: "1.3"
 ---
 
 # GitHub Operations
@@ -33,6 +33,7 @@ The `sh` fences assume a POSIX shell. Adapt the wrapper, keep the parameters.
 - `base64 -w0` is GNU. macOS `base64` wraps by default; `openssl base64 -A` works on both and on Windows when OpenSSL is installed.
 - Heredocs do not exist in `cmd.exe` or PowerShell. Write the JSON to a file and pass its path to `--input`.
 - `jq` may be absent even where `gh` exists. `gh --jq` carries its own filter engine, so the commands here never call `jq` directly.
+- `-f` turns every value into a string; `-F` keeps booleans and numbers typed. `-f draft=false` arrives as the string `false`, which a boolean field rejects. Use `-F` for booleans and numbers, or send the whole body through `--input`.
 
 ## Step 1 — Who you are acting as
 
@@ -50,7 +51,7 @@ Write access and repository visibility are different things. `push: true` on a p
 ## Step 2 — Reading
 
 ```sh
-gh repo list --limit 30                     # repositories the token's account owns
+gh repo list --limit 30                     # repositories the token can see
 gh api 'repos/<owner>/<repo>/git/trees/<branch>?recursive=1' --jq '.tree[].path'
 gh api repos/<owner>/<repo>/contents/<path> --jq .content | base64 -d
 gh api repos/<owner>/<repo>/contents/<path> -H 'Accept: application/vnd.github.raw'
@@ -63,10 +64,18 @@ Which call to use:
 - `raw.githubusercontent.com` serves cached content. A file pushed seconds ago can return the previous version. Read through the API with `?ref=<sha>` when freshness matters.
 - Base64 from `contents` arrives wrapped. `base64 -d` accepts the newlines; macOS spells the same flag `-D`. `openssl base64 -d -A` works everywhere OpenSSL exists.
 - A commit's file list without the diff: `gh api repos/<owner>/<repo>/commits/<sha> --jq '.files[] | {filename, status, additions, deletions}'`.
+- `gh api` returns one page of 30 and follows nothing. `--paginate` walks the `Link` header and prints every page; `per_page=100` cuts the number of calls. A total read from one page is a page size, not a total — issues, pull requests and runs all need this.
 
 ## Step 3 — Changing one file
 
 ```sh
+# new file: send no sha field
+gh api -X PUT repos/<owner>/<repo>/contents/<path> \
+  -f message='<what changed and why>' \
+  -f content="$(base64 -w0 <local-file>)" \
+  -f branch='<branch>'
+
+# existing file: read the sha, then send it
 SHA=$(gh api repos/<owner>/<repo>/contents/<path>?ref=<branch> --jq .sha)
 gh api -X PUT repos/<owner>/<repo>/contents/<path> \
   -f message='<what changed and why>' \
@@ -75,21 +84,19 @@ gh api -X PUT repos/<owner>/<repo>/contents/<path> \
   -f branch='<branch>'
 ```
 
-Updating an existing file requires `sha`. Creating a new one must omit it, so when the file does not exist yet, skip the read: an empty `sha=""` is sent as a field and returns 422, while a missing field is correct.
-
-Which case you are in is decided by that first read. A 404 there means new file, and the PUT then carries no `sha` at all.
+Which block applies is decided by the read, not guessed. `GET /contents/<path>?ref=<branch>` answering 404 means the file does not exist, so the PUT carries no `sha` field at all. Answering 200 means it does, and the `sha` comes from that same response. An empty `sha=""` is a field with a bad value: 422.
 
 Always pass `branch`. Without it the write lands on the default branch, which is rarely the intent when a session is about to open a pull request.
 
 The `message` becomes permanent history. One line saying what changed and why; `update` and `fix` leave nothing for the next reader.
 
-Content is base64 without line breaks. See the platform note in Step 0 for the encoder.
+Content is base64 without line breaks. See the platform note in Step 0 for the encoder. Past about 1 MB the base64 string exceeds the argument-list limit, so write the JSON to a file and pass `--input -`; the substitution works the same.
 
 A path with spaces, `#`, `?` or non-ASCII characters has to be percent-encoded inside the URL. A space sent raw becomes a different path, and the write succeeds against the wrong file or returns 404.
 
 ## Step 4 — Changing several files at once
 
-Atomic, one commit, four writes after two reads. Worth it at three or more files, or whenever a partial apply would leave the repository broken. One or two files are cheaper through Step 3.
+Atomic, one commit: N blob writes, one tree, one commit, one ref move, after two reads. Three or more files justify it, and so does any change where a partial apply leaves the repository broken. One or two files are cheaper through Step 3.
 
 Arrays of objects do not survive `-f` flags. Pass JSON with `--input`. The heredocs below are unquoted on purpose so the shell substitutes the variables; base64 uses only `A-Z a-z 0-9 + / =`, so nothing in the payload collides with shell expansion.
 
@@ -213,6 +220,8 @@ If the tag does not exist, it is created at `--target`. If it does exist, it is 
 
 `--draft` keeps the release invisible until someone publishes it. `--prerelease` marks it without hiding it.
 
+Attached files are objects of their own, not part of the tree, so moving the tag later leaves them as they were. `gh release upload <tag> <file> --repo <owner>/<repo>` adds one; the same name twice fails 422 `already_exists`, and `--clobber` replaces it. Over REST the host is `uploads.github.com`, not `api.github.com`: `POST /repos/<owner>/<repo>/releases/<id>/assets?name=<name>` with `--data-binary @<file>` and a `Content-Type` header. Replacing one means `DELETE /releases/assets/<id>` first, which returns 204 and no body.
+
 Deleting a release leaves the tag behind. Removing both takes two calls, and both belong to Step 10.
 
 ## Step 10 — Deleting and other irreversible changes
@@ -268,7 +277,7 @@ Before running any local `rm -rf`, list the absolute path and the file count, an
 
 ### Permissions
 
-`DELETE /repos/...` needs `delete_repo` on a classic token, or `Administration: write` on a fine-grained one. Missing it returns 403, and no scope added afterwards fixes a token issued without that permission; it has to be reissued.
+`DELETE /repos/...` needs `delete_repo` on a classic token, or `Administration: write` on a fine-grained one. Missing it returns 403. A fine-grained token can be edited to add the permission and keeps its value; a classic token cannot gain a scope after it is issued, so it has to be regenerated.
 
 Changing visibility to private breaks every anonymous reader: forks, badges, integrations, documentation links. Say it before the call, once.
 
@@ -282,8 +291,10 @@ The permission each field needs is on the fine-grained list at https://docs.gith
 
 Read the status code first; the body is often generic.
 
+Then read `x-accepted-github-permissions` off the response. Every REST response carries it, naming the permission and level the endpoint checks — `contents=write`, `administration=read`, `secrets=read`. It answers "which permission" without a guess. A header naming a permission the token already holds means the permission is not the problem: check the repository selection, then whether an organization has approved the token.
+
 - `401` — the credential is absent, malformed, revoked or expired. This belongs to `github-onboard`; reissuing is the fix, retrying is not.
-- `403` `Resource not accessible by personal access token` — the token type cannot do this. Change type, do not add scopes.
+- `403` `Resource not accessible by personal access token` — a fine-grained token was refused. The header names the permission; add it, or raise its level. Only when no fine-grained permission exists for the operation does the type have to change, and `github-onboard` 3.4 lists those six cases.
 - `403` with `X-GitHub-SSO` — the organization has not authorized this token. The user clears it on the organization's SSO page; nothing on this side changes it.
 - `403` with `rate limit` in the body — read `X-RateLimit-Reset`, wait, retry once. Secondary limits send the same code without that header and want a pause, not a retry loop.
 - `404` on an object that exists in a browser — the credential lacks access. GitHub answers 404 instead of 403 on purpose. Recheck repository selection before telling anyone the object is gone.
@@ -304,7 +315,7 @@ After any write, three lines:
 2. How it was verified — the read that came back and what it showed.
 3. Next action — one command, one click, or nothing left.
 
-A bare "done" is indistinguishable from an attempted change that failed silently, for whoever reads this session later.
+A bare "done" does not say whether anything changed.
 
 ## Credential hygiene
 
