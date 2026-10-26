@@ -223,6 +223,8 @@ Three lines:
 2. Next action: one command or one click.
 3. Dead ends hit, if any, for example "client would not send a bearer token, fell back to REST". Skip this line when the path was clean.
 
+These three lines are for the person who asked. Nothing here belongs on a release page or in a readme; github-operate covers that kind of writing.
+
 ## Credential hygiene
 
 Store a token in a file only its owner can read:

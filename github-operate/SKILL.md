@@ -125,7 +125,7 @@ JSON
 
 A tree entry carrying `"sha": null` deletes that path. A path left out of `tree` stays as it was, because the new tree is `base_tree` plus the entries listed.
 
-That last sentence depends entirely on `base_tree` being in the request. Omit it and the call means the opposite: the tree becomes exactly what you listed, and every other path in the repository is deleted. The call still answers 201, and the response lists only the entries you sent, so nothing in it marks the paths that disappeared.
+Drop `base_tree` and the call means the opposite: the tree becomes exactly what you listed, and every other path in the repository is deleted. The call still answers 201, and the response lists only the entries you sent, so nothing in it marks the paths that disappeared.
 
 Send `base_tree` on every call meant to modify an existing repository, then count the result: `GET /git/trees/<new>?recursive=1` should show the previous blob count plus the paths you added, minus the paths you deleted. A count taken from the request you sent only repeats what you asked for.
 
@@ -207,6 +207,8 @@ gh release view <tag> --repo <owner>/<repo> --json tagName,targetCommitish,isDra
 ```
 
 A tag that does not exist is created at `--target`. A tag that does exist is reused, so a mistyped tag publishes against whatever commit already carries it. Read the release back and compare `targetCommitish` against the commit you meant. `--draft` keeps the release invisible until someone publishes it, and `--prerelease` marks it without hiding it.
+
+What goes in the notes is a separate question with its own rules. See *The words that ship*.
 
 A tag fixes two things. It sets the commit the release page describes, and it sets what the automatically generated Source code archives contain, because GitHub builds those from the tag when someone downloads them rather than from the branch. A tag sitting behind `main` therefore serves old code as the download while the hand-uploaded assets hold the new files, and the release page carries both under one version number. Read `GET /git/refs/tags/<tag>` and `GET /git/refs/heads/main` before publishing. When the two SHAs differ, cut a new tag on the current head; moving the old one keeps the assets in place and leaves the earlier archives holding files nobody can reach.
 
@@ -332,6 +334,49 @@ After any write, three lines:
 3. Next action: one command, one click, or nothing left.
 
 A bare "done" leaves the reader unable to tell whether anything happened.
+
+## The words that ship
+
+Four things leave the repository carrying text: the commit message, the release notes, the readme, and the body of an issue or a pull request. Each one is read by someone you are not standing next to.
+
+### Commit message
+
+One line, under seventy characters, saying what changed. The diff already shows where, so the line carries the reason. `Update files` and `Fix stuff` restate the diff and add nothing.
+
+### Release notes
+
+The reader is deciding whether to download this version. They have not read the diff and will not read it.
+
+- Say what changed for them, in their words. "Topics can be set now" reaches them, and `PUT /repos/<owner>/<repo>/topics` does not.
+- Say what they have to do: download again, copy the folders again, or nothing. When the answer is nothing, write that rather than leaving it to be inferred.
+- One paragraph. A release that only repackages an earlier one gets one sentence and says so.
+- Field names, endpoint names, permission names and the reason a design was chosen stay out. Those belong in the commit message and in the conversation with the person who asked for the change.
+- A change the user cannot see does not get a line in the release notes. Report it in the conversation instead.
+
+No inline code in a release body. GitHub offers a machine translation of the page, and in that translation every code span is pushed to the end of its paragraph, so the sentence arrives full of holes with a row of boxes underneath. Write the body in the language its readers use, and spell a value out rather than wrapping it.
+
+### Readme
+
+Two readers arrive thirty seconds apart. The first is deciding what this is and whether it runs on their machine; the second has decided and wants exact steps. The opening paragraph serves the first and the steps sit below it. A readme that opens with architecture loses the first reader and never reaches the second.
+
+### Issue and pull request bodies
+
+Write what happened, what was expected, and the smallest input that shows both. Paste output rather than retyping it, because the exact characters are the diagnosis.
+
+### What reads as machine-written
+
+Eight habits, each removable without losing information:
+
+1. A sentence explaining why the sentence before it was written. Keep the fact, drop the commentary.
+2. A balanced pair closing a paragraph. Say the fact once.
+3. An opener announcing the point, such as `It is worth noting` or `A word of caution`. Start with the fact.
+4. Two words for one thing in the same paragraph.
+5. List items starting with a bare noun, leaving the sentence without a subject.
+6. Text describing its own existence: `This version rewrites the readme`, `These two skills are for an agent`. Describe the effect instead.
+7. Three adjectives in a row.
+8. In Chinese, a closing cadence that reverses the sense (`不是…而是…`) and pairs kept only because they balance.
+
+What survives the cut should have a subject, a verb and a value.
 
 ## Markdown bound for a repository
 
