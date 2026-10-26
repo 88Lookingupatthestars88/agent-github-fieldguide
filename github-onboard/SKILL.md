@@ -4,7 +4,7 @@ description: Gets a user onto GitHub and leaves the agent holding a credential i
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.2"
+  version: "1.3"
 ---
 
 # GitHub Onboarding
@@ -167,7 +167,7 @@ Use `gh api user`, not `gh auth status`. The status command contacts `github.com
 
 When a call comes back `403 Resource not accessible by personal access token`, the message covers four states: a permission that was never ticked, one left at read where the call writes, a repository missing from the token's selection, and an organization that has not approved the token. The response header separates them. Every REST response carries `x-accepted-github-permissions`, naming the permission and level the endpoint checks — `contents=write`, `administration=read`, `secrets=read`.
 
-- Header names a permission the token holds → the permission is not the problem. `GET /repos/<owner>/<repo>` answering 404 while `GET /user` answers 200 means the repository is not in the selection. A 200 on an organization's repository with the call still refused means approval is pending, and an owner clears it at https://github.com/organizations/<org>/settings/personal-access-tokens.
+- Header names a permission the token holds → the permission is not the problem. `GET /repos/<owner>/<repo>` answering 404 while `GET /user` answers 200 means the repository is not in the selection. A 200 on an organization's repository with the call still refused means approval is pending, and an owner clears it at `https://github.com/organizations/<org>/settings/personal-access-tokens`.
 - Header names a permission the token lacks, or a level higher than the one granted → add it or raise it. Settings that look complete usually mean read was ticked where write was needed.
 - No permission covers the operation at all → one of the six above. Change token type.
 - Header reads `allows_permissionless_access=true` → the endpoint needs no permission, so permission is not the problem however the body reads.

@@ -2,15 +2,15 @@
 
 [中文](README.md) · English
 
-Two skills for an agent working on GitHub. `github-onboard` handles sign-up, tokens and the first repository read that works; `github-operate` handles writing files, branching, pull requests and releases. Neither needs the other.
+These two skills are for an agent working on GitHub. `github-onboard` handles sign-up, tokens and the first repository read that works; `github-operate` handles writing files, branching, pull requests and releases. Neither needs the other.
 
 A skill is one folder with a SKILL.md in it, and the client loads it under the folder's name.
 
 ## Download
 
-- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-onboard-SKILL.md) — 17466 B
-- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-operate-SKILL.md) — 22269 B
-- [agent-github-fieldguide-v1.0.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/agent-github-fieldguide-v1.0.0.zip) — 21087 B, both skills with the folders already in place
+- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-onboard-SKILL.md) — 17468 B
+- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-operate-SKILL.md) — 24212 B
+- [agent-github-fieldguide-v1.0.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/agent-github-fieldguide-v1.0.0.zip) — 21932 B, both skills with the folders already in place
 
 Each file is one skill's SKILL.md and goes into a folder named after that skill:
 
@@ -19,7 +19,7 @@ your skills dir/github-onboard/SKILL.md
 your skills dir/github-operate/SKILL.md
 ```
 
-The folder name has to match the name line at the top of the file, or the client rejects the skill. The zip already carries both folders, so unpacking it into the skills directory is enough.
+The folder name has to match the name line at the top of the file, or the client rejects it. The zip already carries both folders, so unpacking it into the skills directory is enough.
 
 Where the skills directory lives differs per client. Search its settings for skills, or read its documentation.
 
@@ -88,7 +88,7 @@ cp -r agent-github-fieldguide/github-onboard ~/.claude/skills/
 cp -r agent-github-fieldguide/github-operate ~/.claude/skills/
 ```
 
-Replace `~/.claude/skills/` with your client's skills directory, or use the download links above if there is no git. A client without skill support can take the file pasted into the system prompt.
+Replace `~/.claude/skills/` with your client's skills directory, or use the download links above if there is no git. A client without skill support can take the SKILL.md pasted into the system prompt.
 
 ## Feedback
 

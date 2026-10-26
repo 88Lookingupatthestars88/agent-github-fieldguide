@@ -2,15 +2,15 @@
 
 中文 · [English](README.en.md)
 
-两个 skill，给在 GitHub 上干活的 agent 用。`github-onboard` 负责注册、token 和第一次读通仓库，`github-operate` 负责写文件、开分支、发 PR、发版。两个互不依赖。
+这两个 skill 给在 GitHub 上干活的 agent 用。`github-onboard` 负责注册、token 和第一次读通仓库，`github-operate` 负责写文件、开分支、发 PR、发版。两个互不依赖。
 
 一个 skill 就是一个文件夹加一个 `SKILL.md`，客户端按文件夹名加载。
 
 ## 下载
 
-- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-onboard-SKILL.md) — 17466 B
-- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-operate-SKILL.md) — 22269 B
-- [agent-github-fieldguide-v1.0.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/agent-github-fieldguide-v1.0.0.zip) — 21087 B，两个 skill 连文件夹一起打包
+- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-onboard-SKILL.md) — 17468 B
+- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-operate-SKILL.md) — 24212 B
+- [agent-github-fieldguide-v1.0.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/agent-github-fieldguide-v1.0.0.zip) — 21932 B，两个 skill 连文件夹一起打包
 
 每个文件都是一个 skill 的 SKILL.md，放进和它同名的文件夹里：
 
@@ -19,7 +19,7 @@
 你的 skills 目录/github-operate/SKILL.md
 ```
 
-文件夹名必须和文件开头那行的 name 一致，不一致客户端会直接拒收。zip 解开就是这两层目录，复制进去即可。
+文件夹名必须和文件开头那行的 name 一致，否则客户端直接拒收。zip 解开就是这两层目录，复制进去即可。
 
 skills 目录在哪，各家客户端不一样。设置里搜 skills 或「技能」，找不到就翻客户端文档。
 
@@ -42,7 +42,7 @@ agent 已经能读仓库、需要改东西时用这个 skill。
 - 改一个文件时，它先读当前的 `sha`。文件不存在就不带这个字段，带空值会返回 422。
 - 一次改多个文件时，它走 Git Data API 合成一个提交；请求里带 `base_tree`，移动 ref 之前再读一次 head。
 - 分支、PR、Issue、workflow、Release 也都管。三种合并方式各会留下什么，动手前会讲清楚。Release 附件是独立对象，移动 tag 不会带着它走。
-- 删除之前，它先给一份编号清单，每项写清会被带走什么，再说明清单之外还有什么。拿到明确同意才动手，一次删一项。删仓库、删分支、删文件、删本地目录各自单独确认。
+- 删除之前，它先给一份编号清单，每项写清会被带走什么，再说明清单之外还有什么。拿到明确确认才动手，一次删一项。删仓库、删分支、删文件、删本地目录各自单独确认。
 
 ## 两个一起用
 
@@ -88,7 +88,7 @@ cp -r agent-github-fieldguide/github-onboard ~/.claude/skills/
 cp -r agent-github-fieldguide/github-operate ~/.claude/skills/
 ```
 
-`~/.claude/skills/` 换成你客户端实际的 skills 目录。没有 git 就用上面的下载链接。客户端不支持 skill，把 SKILL.md 粘进系统提示也能用。
+`~/.claude/skills/` 换成你客户端实际的 skills 目录。没有 git 就用上面的下载链接。客户端不支持 skill 的，把 SKILL.md 粘进系统提示也能用。
 
 ## 反馈
 

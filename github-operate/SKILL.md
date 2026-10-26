@@ -4,7 +4,7 @@ description: Does the work once the agent can already read a repository. Use whe
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.3"
+  version: "1.4"
 ---
 
 # GitHub Operations
@@ -93,6 +93,8 @@ The `message` becomes permanent history. One line saying what changed and why; `
 Content is base64 without line breaks. See the platform note in Step 0 for the encoder. Past about 1 MB the base64 string exceeds the argument-list limit, so write the JSON to a file and pass `--input -`; the substitution works the same.
 
 A path with spaces, `#`, `?` or non-ASCII characters has to be percent-encoded inside the URL. A space sent raw becomes a different path, and the write succeeds against the wrong file or returns 404.
+
+A `.md` file is rendered wherever the repository shows it, so it gets checked before the write. See *Markdown bound for a repository*.
 
 ## Step 4 — Changing several files at once
 
@@ -316,6 +318,32 @@ After any write, three lines:
 3. Next action — one command, one click, or nothing left.
 
 A bare "done" does not say whether anything changed.
+
+## Markdown bound for a repository
+
+A `.md` file is rendered wherever GitHub shows it, and the renderer reads `<` as the start of an HTML tag. A path written as `<your skills dir>/x` leaves a tag the renderer drops, and the code spans sharing that paragraph can be pulled to its end. On a phone that reads as a broken sentence followed by loose boxes, and the sentence no longer says anything.
+
+Four checks, one command each:
+
+```sh
+# 1. no < outside a fenced block, after inline code is stripped — this is the one that broke
+for f in *.md; do awk '/^```/{b=!b; next} !b' "$f" | sed 's/`[^`]*`//g' | grep -n '<' | sed "s|^|$f:|"; done
+
+# 2. fences paired; the count has to be even
+grep -c '^```' *.md
+
+# 3. every link closes
+a=$(grep -o '](' *.md | wc -l); b=$(grep -oE '\]\([^)]*\)' *.md | wc -l); echo "$a $b"
+
+# 4. a code span alone on its line is a sentence missing its subject
+awk '/^```/{f=!f; next} !f && /^[[:space:]]*`[^`]+`[[:space:]]*$/{print FILENAME":"FNR": "$0}' *.md
+```
+
+Write a path as `your skills dir/github-onboard/SKILL.md`, in a fenced block or inline, and leave the brackets off unless the sentence is about the brackets themselves.
+
+Two things the commands do not catch. A list whose items all begin with a noun (`Reads:`, `Writes:`, `Deletes:`) has no subject, and a reader landing in the middle of it has no sentence to parse; give every item a subject and a verb. And a byte count quoted beside a download link goes stale the moment that file changes: run `wc -c`, paste the number, and recheck it in the same commit that touches the file.
+
+`python3 -m markdown file.md` prints the HTML, after `pip install markdown` on a machine that lacks it. A paragraph holding several `<code>` runs in a row is the failure this section is about, and the HTML shows it before a phone does.
 
 ## Credential hygiene
 
