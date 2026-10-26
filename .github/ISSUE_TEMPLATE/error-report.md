@@ -2,7 +2,6 @@
 name: Something returned an error
 about: An error from the GitHub MCP endpoint or from the REST API
 title: "[error] "
-labels: ""
 ---
 
 **The exact response**
