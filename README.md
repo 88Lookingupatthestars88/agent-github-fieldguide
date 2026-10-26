@@ -8,9 +8,9 @@
 
 ## 下载
 
-- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-onboard-SKILL.md) — 17468 B
-- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-operate-SKILL.md) — 24212 B
-- [agent-github-fieldguide-v1.0.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/agent-github-fieldguide-v1.0.0.zip) — 21932 B，两个 skill 连文件夹一起打包
+- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.1/github-onboard-SKILL.md) — 17468 B
+- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.1/github-operate-SKILL.md) — 24212 B
+- [agent-github-fieldguide-v1.0.1.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.1/agent-github-fieldguide-v1.0.1.zip) — 21932 B，两个 skill 连文件夹一起打包
 
 每个文件都是一个 skill 的 SKILL.md，放进和它同名的文件夹里：
 

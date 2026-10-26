@@ -8,9 +8,9 @@ A skill is one folder with a SKILL.md in it, and the client loads it under the f
 
 ## Download
 
-- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-onboard-SKILL.md) — 17468 B
-- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/github-operate-SKILL.md) — 24212 B
-- [agent-github-fieldguide-v1.0.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.0/agent-github-fieldguide-v1.0.0.zip) — 21932 B, both skills with the folders already in place
+- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.1/github-onboard-SKILL.md) — 17468 B
+- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.1/github-operate-SKILL.md) — 24212 B
+- [agent-github-fieldguide-v1.0.1.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.1/agent-github-fieldguide-v1.0.1.zip) — 21932 B, both skills with the folders already in place
 
 Each file is one skill's SKILL.md and goes into a folder named after that skill:
 
