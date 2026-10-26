@@ -4,7 +4,7 @@ description: Does the work once the agent can already read a repository. Use whe
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.6"
+  version: "1.7"
 ---
 
 # GitHub Operations
@@ -242,9 +242,9 @@ Which topics to pick is a question about which list a person scrolls, not about 
 
 The social preview image has no REST endpoint and no GraphQL mutation. `GET /repos/<owner>/<repo>` omits the field, GraphQL exposes it read-only as `openGraphImageUrl`, and `gh repo edit` carries no flag for it. The user opens `https://github.com/<owner>/<repo>/settings`, finds Social preview and picks a file; say that rather than scripting around it. The image wants 1280×640, PNG or JPEG, under 1 MB, and it is what every link to the repository renders as in a chat client or on a social timeline.
 
-An issue template lives in `.github/ISSUE_TEMPLATE/` and is a file in the tree, so Step 3 or Step 4 writes it. Two files do the work: one or more `*.yml` forms, and a `config.yml` whose `blank_issues_enabled: false` removes the empty option and whose `contact_links` sends questions somewhere else. The community profile endpoint reports `issue_template` as missing when the directory holds only a form, so `config.yml` is what closes that gap.
+An issue template is a file in the tree, so Step 3 or Step 4 writes it, and where it goes decides whether the community profile sees it. A form at `.github/ISSUE_TEMPLATE/error-report.yml`, with a `config.yml` beside it carrying `blank_issues_enabled: false` and `contact_links`, produces a working chooser and does not clear the `issue_template` field. A single `.github/ISSUE_TEMPLATE.md` beside that directory does clear it, measured on this repository: the field read false for three minutes with the directory populated and flipped within twenty seconds of adding the single file. One file at the documented path, not a directory of them.
 
-A public repository is ready when the files sit on the default branch, the release tag sits on that same commit, the assets read back with the expected bytes, the topics are set, the description is filled, an issue template sits beside a `config.yml`, and Discussions is either configured or deliberately off. Every item is confirmed by reading it back, because a 200 is not evidence that a field changed.
+A public repository is ready when the files sit on the default branch, the release tag sits on that same commit, the assets read back with the expected bytes, the topics are set, the description is filled, an issue template exists at a path the community profile reads, and Discussions is either configured or deliberately off. Every item is confirmed by reading it back, because a 200 is not evidence that a field changed.
 
 ## Step 10 — Deleting and other irreversible changes
 
