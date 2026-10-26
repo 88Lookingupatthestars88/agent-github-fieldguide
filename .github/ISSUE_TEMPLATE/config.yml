@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Usage questions
+    url: https://github.com/88Lookingupatthestars88/agent-github-fieldguide/discussions/categories/q-a
+    about: Installing, running a step. Answers there can be marked as solved.
+  - name: GitHub's own documentation
+    url: https://docs.github.com/en/rest
+    about: Endpoint behaviour that reads wrong but is documented.
