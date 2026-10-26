@@ -341,17 +341,19 @@ Four checks, one command each:
 
 ```sh
 # 1. no < outside a fenced block, after inline code is stripped — this is the one that broke
-for f in *.md; do awk '/^```/{b=!b; next} !b' "$f" | sed 's/`[^`]*`//g' | grep -n '<' | sed "s|^|$f:|"; done
+for f in *.md; do awk '/^[[:space:]]*```/{b=!b; next} !b' "$f" | sed 's/`[^`]*`//g' | grep -n '<' | sed "s|^|$f:|"; done
 
 # 2. fences paired; the count has to be even
-grep -c '^```' *.md
+grep -cE '^[[:space:]]*```' *.md
 
 # 3. every link closes
 a=$(grep -o '](' *.md | wc -l); b=$(grep -oE '\]\([^)]*\)' *.md | wc -l); echo "$a $b"
 
 # 4. a code span alone on its line is a sentence missing its subject
-awk '/^```/{f=!f; next} !f && /^[[:space:]]*`[^`]+`[[:space:]]*$/{print FILENAME":"FNR": "$0}' *.md
+awk '/^[[:space:]]*```/{f=!f; next} !f && /^[[:space:]]*`[^`]+`[[:space:]]*$/{print FILENAME":"FNR": "$0}' *.md
 ```
+
+Every one of those reads a fence as a line of three backticks at column zero. A fenced block nested under a numbered step is indented by three spaces, and Markdown accepts that, so a block starting at column zero and closing at column three balances nothing: an unclosed indented block counts as zero fences, and the parity check passes while the page renders wrong. The `[[:space:]]*` in each pattern is what makes the nested case count.
 
 Write a path as `your skills dir/github-onboard/SKILL.md`, in a fenced block or inline, and leave the brackets off unless the sentence is about the brackets themselves.
 
