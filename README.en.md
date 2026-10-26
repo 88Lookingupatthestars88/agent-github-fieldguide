@@ -2,47 +2,60 @@
 
 [中文](README.md) · English
 
-These two skills are for an agent working on GitHub. `github-onboard` handles sign-up, tokens and the first repository read that works; `github-operate` handles writing files, branching, pull requests and releases. Neither needs the other.
-
-A skill is one folder with a SKILL.md in it, and the client loads it under the folder's name.
+Two Agent Skills that let an agent work GitHub on its own. `github-onboard` handles the credential; `github-operate` handles reading, writing, pull requests and releases. Both are plain text and take effect once the client loads them.
 
 ## Download
 
-- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.1/github-onboard-SKILL.md) — 17468 B
-- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.1/github-operate-SKILL.md) — 24212 B
-- [agent-github-fieldguide-v1.0.1.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.0.1/agent-github-fieldguide-v1.0.1.zip) — 21932 B, both skills with the folders already in place
+- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.1.0/github-onboard-SKILL.md) — 17283 B
+- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.1.0/github-operate-SKILL.md) — 28551 B
+- [agent-github-fieldguide-v1.1.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.1.0/agent-github-fieldguide-v1.1.0.zip) — 23294 B, both skills with their folders
 
-Each file is one skill's SKILL.md and goes into a folder named after that skill:
+## Install
+
+Unzipping gives you two folders. Put both folders into the client's skills directory, like this:
 
 ```
 your skills dir/github-onboard/SKILL.md
 your skills dir/github-operate/SKILL.md
 ```
 
-The folder name has to match the name line at the top of the file, or the client rejects it. The zip already carries both folders, so unpacking it into the skills directory is enough.
+The folder name has to match the `name` on the second line of the file, or the client will not load it.
 
-Where the skills directory lives differs per client. Search its settings for skills, or read its documentation.
+Skills directories differ per client. Search the settings for skills; if there is no such setting, create the directory where the client's documentation says.
+
+Downloading a single SKILL.md works too, as long as you make the folder yourself. A client without skill support can take the whole SKILL.md pasted into its system prompt.
+
+To clone instead:
+
+```sh
+git clone https://github.com/88Lookingupatthestars88/agent-github-fieldguide
+cp -r agent-github-fieldguide/github-onboard ~/.claude/skills/
+cp -r agent-github-fieldguide/github-operate ~/.claude/skills/
+```
+
+Replace `~/.claude/skills/` with your client's actual path.
 
 ## github-onboard
 
-Use this skill when the agent has no credential GitHub will accept. It keeps going until a credential has actually read one repository.
+Use it when no working credential exists yet. The job ends at a real repository read through that credential, not at a token in hand.
 
-- No account yet: sign up at https://github.com/signup, and correct whatever the page rejects according to the message it shows.
-- Already have an account: sign in at https://github.com/login. Sign-in worked if https://github.com/settings/profile opens.
-- Whether the client can finish OAuth depends on whether it ships a registered GitHub app. VS Code 1.101 and later, Visual Studio, JetBrains, Eclipse and Cursor do. A generic MCP connector ships none, cannot finish OAuth, and takes a token instead. The cause sits on GitHub's side: there is no dynamic client registration, so a client has nowhere to register itself.
-- Without OAuth, this skill builds a fine-grained token: which permission this task needs, and the six operations no permission covers, where the token type has to change.
-- It supports four transports: MCP with OAuth, MCP with a token in a header, plain REST, and git for clone and push.
-- The last step is one real read. With a repository, it reads that repository. With none, it reads the repository list, where an empty array counts as success.
+- No account: sign up at https://github.com/signup and correct whatever the page rejects.
+- Already have one: sign in at https://github.com/login. Sign-in worked if https://github.com/settings/profile opens.
+- Whether OAuth can finish depends on the client shipping a registered GitHub app. VS Code 1.101 and later, Visual Studio, JetBrains, Eclipse and Cursor do; a generic MCP connector does not, and takes a token instead. The cause sits on GitHub's side: no dynamic client registration, so a client has nowhere to register itself.
+- Without OAuth it builds a fine-grained token: the permission follows the task, and six operations have no fine-grained permission at all, so those need a classic token.
+- Four transports: MCP over OAuth, MCP with a token in a header, plain REST, and git for clone or push.
+- The last step is one real read. With no repository on the account, it reads the repository list, where an empty array also counts.
 
 ## github-operate
 
-Use this skill once the agent can already read a repository and something needs to change.
+Use it once the credential works and something has to change.
 
-- It reads a repository list, a directory tree, or a file's contents. Content over 1 MB needs the raw media type, and a list call returns 30 items unless `--paginate` asks for the rest.
+- It reads a repository list, a directory tree or a file's contents. Content over 1 MB needs the raw media type, and a list call returns 30 items unless paging is asked for.
 - Changing one file starts by reading its current `sha`. A new file carries no `sha` field, and an empty one returns 422.
 - Changing several files goes through the Git Data API as one commit, with `base_tree` set and the head re-read before the ref moves.
-- Branches, pull requests, issues, workflow runs and releases are handled too. What each merge method leaves behind is stated before one is chosen. Release assets are separate objects, so moving the tag does not move them.
-- Deletion starts with a numbered list, naming what each item takes down and what the list does not cover. It runs only after an explicit confirmation, one item at a time. A repository, a branch, a file and a local directory are four separate confirmations.
+- Branches, pull requests, issues, workflow runs and releases are covered. What each merge method leaves behind is stated before one is chosen, and release assets are separate objects that a moved tag does not carry.
+- Deletion starts with a numbered list naming what each item takes down and what the list leaves out. It runs only after an explicit confirmation, one item at a time, and a repository, a branch, a file and a local directory are four separate confirmations.
+- Repository settings are covered too: description, homepage, topics, the Discussions switch. Topics go through PUT, because PATCH answers 200 without changing a single field.
 
 ## Using both
 
@@ -52,15 +65,13 @@ The first request in a session names the repository, and later ones can leave it
 
 A credential obtained through OAuth exists only inside that client. REST calls or git from a shell need a token of their own.
 
-## The endpoint answers four ways
+## When a connection fails, check these four answers
 
-Nothing here is needed to install; come back to it when a connection fails. The GitHub MCP endpoint answers according to what arrived with the request, and three of the four look like a token problem. `token authentication failed` is the only one that is.
+Nothing here is needed to install. The GitHub MCP endpoint answers according to what arrived with the request, and three of the four look like a token problem.
 
 ### 401 bad request: missing required Authorization header
 
-No Authorization header reached the server.
-
-Most often the client is trying to do OAuth. GitHub does not implement dynamic client registration, so the client cannot register itself, gets no token, and sends the request without a header. A new token changes nothing, since no token took part in that request. Put a PAT in the header instead:
+No Authorization header reached the server. Most often the client is still trying to do OAuth: GitHub has no dynamic client registration, so the client cannot register itself, gets no token, and sends the request without a header. A new token changes nothing, because no token took part in that request. Put a PAT in the header instead:
 
 ```json
 { "Authorization": "Bearer github_pat_xxx" }
@@ -68,9 +79,7 @@ Most often the client is trying to do OAuth. GitHub does not implement dynamic c
 
 ### 401 unauthorized: token authentication failed
 
-The token arrived and the server rejected it. It expired, it was revoked, or this endpoint does not accept that token type.
-
-Read the expiry and the permissions, then decide whether to issue another.
+The token arrived and the server rejected it: expired, revoked, or a type this endpoint does not accept. Read the expiry and the permissions, then decide whether to issue another.
 
 ### 400 bad request: Authorization header is badly formatted
 
@@ -78,21 +87,13 @@ The header is there and malformed: `Bearer` with nothing after it, or a scheme o
 
 ### 200 with mcp-session-id
 
-The connection worked. The response carries an `mcp-session-id` header and `serverInfo` in the body. A client that reports success but cannot produce both did not connect.
-
-## Install from source
-
-```sh
-git clone https://github.com/88Lookingupatthestars88/agent-github-fieldguide
-cp -r agent-github-fieldguide/github-onboard ~/.claude/skills/
-cp -r agent-github-fieldguide/github-operate ~/.claude/skills/
-```
-
-Replace `~/.claude/skills/` with your client's skills directory, or use the download links above if there is no git. A client without skill support can take the SKILL.md pasted into the system prompt.
+The connection worked. The response carries an `mcp-session-id` header and `serverInfo` in the body, and a client that reports success without producing both did not connect.
 
 ## Feedback
 
-Issues are open. If a step did not match what you saw, say which step it was and paste what came back instead, because the exact text shows which of the four causes it was. Replies are not guaranteed.
+Issues are open. If a step did not match what you saw, say which step it was and paste what came back instead; the exact text shows which of the four causes it was.
+
+Usage questions belong in Discussions under Q&A, where an answer can be marked as accepted. Replies are not guaranteed.
 
 ## License
 

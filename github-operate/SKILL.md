@@ -1,39 +1,34 @@
 ---
 name: github-operate
-description: Does the work once the agent can already read a repository. Use when the agent needs to list repositories, read or change files, create branches, commit, open or merge a pull request, file or close an issue, inspect or trigger a workflow run, cut a release, change repository settings, or delete a repository, branch, file or directory. Also trigger on 提交代码 / 建分支 / 开 PR / 提 issue / 看 CI / 发 release / 删仓库 / gh CLI / api.github.com / Git Data API / blobs / trees / workflow_dispatch / Actions logs. Assumes a working credential; when there is none, use github-onboard first.
+description: Does the work once the agent can already read a repository. Use when the agent needs to list repositories, read or change files, create branches, commit, open or merge a pull request, file or close an issue, inspect or trigger a workflow run, cut a release, set topics or other repository settings, or delete a repository, branch, file or directory. Also trigger on 提交代码 / 建分支 / 开 PR / 提 issue / 看 CI / 发 release / 改仓库设置 / 加 topics / 删仓库 / gh CLI / api.github.com / Git Data API / blobs / trees / workflow_dispatch / Actions logs. Assumes a working credential; when there is none, use github-onboard first.
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.4"
+  version: "1.5"
 ---
 
 # GitHub Operations
 
-Nothing here covers obtaining a credential. If the agent has no working one, use `github-onboard` first.
+Getting a credential is github-onboard's job. This file starts once one works.
 
 ## Step 0 — What you can call
 
-Three routes to the same API. Find out which exists before writing a command:
+Three routes reach the same API, and which one exists decides the shape of every command below. Check before writing one:
 
-- MCP tools are loaded. Take tool names from the server, not from this file. Use these when one call covers the whole job.
+- MCP tools are loaded. Take tool names from the server rather than from this file, and use this route when a single tool call covers the whole job.
 - A shell with `gh` installed. Confirm with `gh --version`.
-- A shell without `gh`, but HTTPS works. A bearer header on a plain request does everything the other two do.
+- A shell without `gh`, where HTTPS works. A bearer header on a plain request does everything the other two do.
 
-Every command in this file is written in the `gh` form. The other two routes take the same parameters in a different wrapper:
+Every command below is written in the `gh` form. The other two routes take the same parameters in a different wrapper. MCP arguments mirror the endpoint's fields, so a tool asking for `path`, `content`, `message`, `sha` and `branch` is doing what Step 3 does, whatever name the server gave it. Raw HTTPS replaces `gh api <path>` with a request to `https://api.github.com/<path>` plus `Authorization: Bearer`, and replaces `-f k=v` with a JSON body field; `--jq` is a client-side filter with no server equivalent.
 
-- MCP: the arguments mirror the endpoint's fields. When a tool asks for `path`, `content`, `message`, `sha` and `branch`, it is doing what Step 3 does; the name it carries is the server's choice.
-- Raw HTTPS: replace `gh api <path>` with a request to `https://api.github.com/<path>` plus `Authorization: Bearer`. Replace `-f k=v` with a JSON body field. `--jq` is a client-side filter and has no server equivalent.
+Pick one route and keep it for the session. Switching halfway means re-reading the object through the new route before continuing. An OAuth credential living inside an MCP client never reaches a shell, so a shell-only job with no token sends you back to github-onboard.
 
-Pick one route and keep it for the session. Switching mid-change means re-reading the object through the new route before continuing.
+The `sh` fences assume a POSIX shell. The wrapper adapts; the parameters do not.
 
-An OAuth credential that lives inside an MCP client does not reach a shell. If there is no token and the shell is the only route that can do the job, go back to `github-onboard`.
-
-The `sh` fences assume a POSIX shell. Adapt the wrapper, keep the parameters.
-
-- `base64 -w0` is GNU. macOS `base64` wraps by default; `openssl base64 -A` works on both and on Windows when OpenSSL is installed.
+- `base64 -w0` is GNU. macOS `base64` wraps by default. `openssl base64 -A` works on both, and on Windows where OpenSSL is installed.
 - Heredocs do not exist in `cmd.exe` or PowerShell. Write the JSON to a file and pass its path to `--input`.
-- `jq` may be absent even where `gh` exists. `gh --jq` carries its own filter engine, so the commands here never call `jq` directly.
-- `-f` turns every value into a string; `-F` keeps booleans and numbers typed. `-f draft=false` arrives as the string `false`, which a boolean field rejects. Use `-F` for booleans and numbers, or send the whole body through `--input`.
+- `jq` may be absent where `gh` is present. `gh --jq` carries its own filter engine, so nothing here calls `jq` directly.
+- `-f` turns every value into a string, `-F` keeps booleans and numbers typed. `-f draft=false` arrives as the string `false`, which a boolean field rejects. Use `-F` for booleans and numbers, or send the whole body through `--input`.
 
 ## Step 1 — Who you are acting as
 
@@ -44,9 +39,7 @@ gh api user --jq .login
 gh api repos/<owner>/<repo> --jq '{perm: .permissions, default: .default_branch, private: .private}'
 ```
 
-`permissions` reports `admin`, `maintain`, `push`, `triage`, `pull` as booleans. Read them instead of probing with a write. A later 403 is answered by one of these values.
-
-Write access and repository visibility are different things. `push: true` on a public repository still means every read is anonymous unless the token is sent.
+`permissions` reports `admin`, `maintain`, `push`, `triage` and `pull` as booleans. Read them rather than probing with a write, because a later 403 is answered by one of these values. Write access and repository visibility are separate: `push: true` on a public repository still means every read is anonymous unless the token travels with it.
 
 ## Step 2 — Reading
 
@@ -57,14 +50,11 @@ gh api repos/<owner>/<repo>/contents/<path> --jq .content | base64 -d
 gh api repos/<owner>/<repo>/contents/<path> -H 'Accept: application/vnd.github.raw'
 ```
 
-Which call to use:
+A whole directory tree is one `git/trees?recursive=1` call, and `truncated: true` means it hit a limit: drop `recursive` and walk directory by directory. `contents` in JSON form returns base64 and stops at 1 MB, while the raw media type reaches 100 MB; past that, fetch through `git/blobs/<sha>` or clone. `raw.githubusercontent.com` serves cached content, so a file pushed seconds ago can return the previous version — read through the API with `?ref=<sha>` when freshness matters.
 
-- A whole directory tree is one `git/trees?recursive=1` call. `truncated: true` means the tree hit its limit; drop `recursive` and walk directory by directory.
-- `contents` in JSON form returns base64 and stops at 1 MB. The raw media type reaches 100 MB. Past that, fetch the blob through `git/blobs/<sha>` or clone.
-- `raw.githubusercontent.com` serves cached content. A file pushed seconds ago can return the previous version. Read through the API with `?ref=<sha>` when freshness matters.
-- Base64 from `contents` arrives wrapped. `base64 -d` accepts the newlines; macOS spells the same flag `-D`. `openssl base64 -d -A` works everywhere OpenSSL exists.
-- A commit's file list without the diff: `gh api repos/<owner>/<repo>/commits/<sha> --jq '.files[] | {filename, status, additions, deletions}'`.
-- `gh api` returns one page of 30 and follows nothing. `--paginate` walks the `Link` header and prints every page; `per_page=100` cuts the number of calls. A total read from one page is a page size, not a total — issues, pull requests and runs all need this.
+Base64 from `contents` arrives wrapped in newlines. `base64 -d` accepts them, macOS spells the flag `-D`, and `openssl base64 -d -A` works wherever OpenSSL exists. A commit's file list without the diff comes from `gh api repos/<owner>/<repo>/commits/<sha> --jq '.files[] | {filename, status, additions, deletions}'`.
+
+`gh api` returns one page of 30 and follows nothing. `--paginate` walks the `Link` header and prints every page, and `per_page=100` cuts the number of calls. A count taken from one page is a page size; issues, pull requests and workflow runs all need this before anything is counted or deleted.
 
 ## Step 3 — Changing one file
 
@@ -84,23 +74,23 @@ gh api -X PUT repos/<owner>/<repo>/contents/<path> \
   -f branch='<branch>'
 ```
 
-Which block applies is decided by the read, not guessed. `GET /contents/<path>?ref=<branch>` answering 404 means the file does not exist, so the PUT carries no `sha` field at all. Answering 200 means it does, and the `sha` comes from that same response. An empty `sha=""` is a field with a bad value: 422.
+The read decides which block applies. `GET /contents/<path>?ref=<branch>` answering 404 means the file does not exist, so the PUT carries no `sha` field at all; answering 200 means it does, and the `sha` comes from that same response. An empty `sha=""` is a field with a bad value, and returns 422.
 
-Always pass `branch`. Without it the write lands on the default branch, which is rarely the intent when a session is about to open a pull request.
+Pass `branch` every time. Without it the write lands on the default branch, which is rarely what a session about to open a pull request wants.
 
-The `message` becomes permanent history. One line saying what changed and why; `update` and `fix` leave nothing for the next reader.
+The `message` becomes permanent history, so one line saying what changed and why. `update` and `fix` leave the next reader nothing to work with.
 
-Content is base64 without line breaks. See the platform note in Step 0 for the encoder. Past about 1 MB the base64 string exceeds the argument-list limit, so write the JSON to a file and pass `--input -`; the substitution works the same.
+Content is base64 without line breaks; the encoder table in Step 0 covers the platform differences. Past about 1 MB the base64 string exceeds the argument-list limit, so write the JSON to a file and pass `--input -`, which substitutes the same way.
 
-A path with spaces, `#`, `?` or non-ASCII characters has to be percent-encoded inside the URL. A space sent raw becomes a different path, and the write succeeds against the wrong file or returns 404.
+A path holding spaces, `#`, `?` or non-ASCII characters has to be percent-encoded inside the URL. A space sent raw becomes a different path, and the write then lands on the wrong file or returns 404.
 
 A `.md` file is rendered wherever the repository shows it, so it gets checked before the write. See *Markdown bound for a repository*.
 
 ## Step 4 — Changing several files at once
 
-Atomic, one commit: N blob writes, one tree, one commit, one ref move, after two reads. Three or more files justify it, and so does any change where a partial apply leaves the repository broken. One or two files are cheaper through Step 3.
+Three or more files justify this route, and so does any change where applying half of it leaves the repository broken. One or two files are cheaper through Step 3. The shape is N blob writes, one tree, one commit and one ref move, after two reads.
 
-Arrays of objects do not survive `-f` flags. Pass JSON with `--input`. The heredocs below are unquoted on purpose so the shell substitutes the variables; base64 uses only `A-Z a-z 0-9 + / =`, so nothing in the payload collides with shell expansion.
+Arrays of objects do not survive `-f` flags, so the JSON travels through `--input`. The heredocs below are unquoted on purpose, letting the shell substitute the variables; base64 uses only `A-Z a-z 0-9 + / =`, so nothing in the payload collides with shell expansion.
 
 ```sh
 # two reads: head commit, then the tree that commit points at
@@ -133,19 +123,19 @@ gh api -X PATCH repos/<owner>/<repo>/git/refs/heads/<branch> --input - <<JSON
 JSON
 ```
 
-A tree entry with `"sha": null` deletes that path. A path left out of `tree` is unchanged; the new tree is `base_tree` plus the entries listed.
+A tree entry carrying `"sha": null` deletes that path. A path left out of `tree` stays as it was, because the new tree is `base_tree` plus the entries listed.
 
-That last sentence holds only because `base_tree` is in the request. Omit `base_tree` and the call means the opposite thing: the tree becomes exactly what you listed, and every other path in the repository is deleted. The call still returns 201, and the response lists only the entries you sent, so nothing in it marks the ones that went away.
+That last sentence depends entirely on `base_tree` being in the request. Omit it and the call means the opposite: the tree becomes exactly what you listed, and every other path in the repository is deleted. The call still answers 201, and the response lists only the entries you sent, so nothing in it marks the paths that disappeared.
 
-Send `base_tree` on every call meant to modify an existing repository, and count the result after any tree write: `GET /git/trees/<new>?recursive=1` should show the previous blob count plus the paths you added, minus the paths you deleted. A count taken from the request you sent is not a check.
+Send `base_tree` on every call meant to modify an existing repository, then count the result: `GET /git/trees/<new>?recursive=1` should show the previous blob count plus the paths you added, minus the paths you deleted. A count taken from the request you sent only repeats what you asked for.
 
-When one change has to move both a branch and a tag, move the branch first and confirm it before touching the tag. A tag moved first stays on the new commit even if the branch move is rejected, and it then points at a commit that no branch reaches. `PATCH /git/refs/tags/<tag>` takes `force: true`, so nothing rejects that mistake.
+When one change has to move both a branch and a tag, move the branch first and confirm it before touching the tag. A tag moved first stays on the new commit even if the branch move is rejected, so it ends up pointing at a commit no branch reaches, and `PATCH /git/refs/tags/<tag>` takes `force: true` so nothing objects.
 
 `force: false` makes step 4 fail when someone pushed first. With `true` the move overwrites their commit and the API still reports success.
 
-`git/ref/heads/<branch>` returns a commit SHA. Feeding it to `base_tree` returns 422; the tree SHA comes from the second read.
+`git/ref/heads/<branch>` returns a commit SHA, and feeding that to `base_tree` returns 422; the tree SHA comes from the second read.
 
-Deleting files this way is destructive. Step 10 applies: list every path that goes away, wait for a named confirmation.
+Deleting files this way is destructive, so Step 10 applies: list every path that goes away and wait for a named confirmation.
 
 ## Step 5 — Branches
 
@@ -154,11 +144,11 @@ HEAD=$(gh api repos/<owner>/<repo>/git/ref/heads/<base> --jq .object.sha)
 gh api -X POST repos/<owner>/<repo>/git/refs -f ref='refs/heads/<new>' -f sha="$HEAD"
 ```
 
-`ref` needs the full `refs/heads/` prefix. `heads/<new>` returns 422.
+`ref` needs the full `refs/heads/` prefix; `heads/<new>` returns 422.
 
-A repository with no commits has no default branch and no head SHA. There the first commit is Step 3 with `branch` set to the intended default branch name and no `sha`; GitHub creates the branch with that commit.
+A repository with no commits has no default branch and no head SHA. There the first commit is Step 3 with `branch` set to the intended default branch name and no `sha`, and GitHub creates the branch along with it.
 
-Deleting a branch is Step 10. `PATCH /git/refs` with `force: true` and `git push --force` rewrite history that others may already have; both count as destructive there.
+Deleting a branch is Step 10. `PATCH /git/refs` with `force: true` and `git push --force` rewrite history that others may already hold, and both count as destructive there.
 
 ## Step 6 — Pull requests
 
@@ -170,15 +160,15 @@ gh pr merge <n> --repo <owner>/<repo> --squash
 
 What each merge method leaves behind:
 
-- merge keeps every commit and adds a merge commit; the base branch shows the branch topology.
-- squash collapses to a single commit; the original commits are no longer reachable from the base branch.
-- rebase replays the commits onto the base with new SHAs; anyone holding the old ones now has a divergent branch.
+- merge keeps every commit and adds a merge commit, so the base branch shows the branch topology.
+- squash collapses to a single commit, and the original commits stop being reachable from the base branch.
+- rebase replays the commits onto the base with new SHAs, and anyone holding the old ones now has a divergent branch.
 
-`--delete-branch` deletes the head branch as part of the merge, which is a deletion and therefore Step 10. Run the merge without the flag unless the user already agreed to losing the branch; then delete it as its own confirmed item.
+`--delete-branch` deletes the head branch as part of the merge, which makes it a deletion and therefore Step 10. Run the merge without the flag unless the user already agreed to losing the branch, then delete it as its own confirmed item.
 
 Without the flag the head branch stays. Deleting a branch that still holds unmerged commits drops those commits from the branch list; they stay reachable by SHA through the API until garbage collection runs, which has no user-facing trigger.
 
-`mergeable: false` with `mergeStateStatus: dirty` means conflicts against the base. Resolution happens on the head branch; the API has no server-side conflict resolution.
+`mergeable: false` with `mergeStateStatus: dirty` means conflicts against the base. Resolution happens on the head branch, since the API has no server-side conflict resolution.
 
 ## Step 7 — Issues
 
@@ -188,9 +178,9 @@ gh issue comment <n> --repo <owner>/<repo> --body '<...>'
 gh issue close <n> --repo <owner>/<repo> --reason completed
 ```
 
-Issues need `issues: write` on a fine-grained token. A pull request conversation accepts the same comment endpoint, but a token scoped only to issues fails there, which reads like a permissions bug and is not.
+Issues need `issues: write` on a fine-grained token. A pull request conversation accepts the same comment endpoint, but a token scoped only to issues fails there, which reads like a permissions bug and is not one.
 
-Closing is reversible through `gh issue reopen`. REST has no endpoint that deletes an issue; do not promise one.
+Closing is reversible through `gh issue reopen`. REST has no endpoint that deletes an issue, so do not promise one.
 
 ## Step 8 — Workflows
 
@@ -201,15 +191,13 @@ gh run watch <id> --repo <owner>/<repo>
 gh workflow run <file>.yml --repo <owner>/<repo> --ref <branch>
 ```
 
-`conclusion` reads `success`, `failure`, `cancelled`, `skipped`, or `null` while the run is still going. `null` with `status: in_progress` is not a failure.
+`conclusion` reads `success`, `failure`, `cancelled`, `skipped`, or `null` while the run is still going, so `null` with `status: in_progress` is not a failure.
 
-Logs come back as a zip behind a redirect. `gh run view --log` and `--log-failed` unpack them. A raw HTTP client must follow the 302 and unzip; the archive read as text is binary noise, not an error message.
+Logs come back as a zip behind a redirect. `gh run view --log` and `--log-failed` unpack them; a raw HTTP client has to follow the 302 and unzip, because the archive read as text is binary noise rather than an error message.
 
-`workflow_dispatch` needs the workflow file to exist on the default branch, even when `--ref` names another branch. A 404 on dispatch usually means the workflow only lives on a feature branch, so either merge it first or send the event another way.
+`workflow_dispatch` needs the workflow file to exist on the default branch even when `--ref` names another one. A 404 on dispatch usually means the workflow lives only on a feature branch, so merge it first or send the event another way.
 
-Triggering needs `actions: write`. Reading logs needs `actions: read`.
-
-A push authenticated with a PAT starts workflows. A push made with a workflow's own `GITHUB_TOKEN` does not, which is deliberate: it prevents a workflow from triggering itself in a loop. A CI chain that stops after the first job is behaving as designed.
+Triggering needs `actions: write` and reading logs needs `actions: read`. A push authenticated with a PAT starts workflows; a push made with a workflow's own `GITHUB_TOKEN` does not, deliberately, so that a workflow cannot trigger itself in a loop. A CI chain stopping after the first job is behaving as designed.
 
 ## Step 9 — Releases
 
@@ -218,35 +206,65 @@ gh release create <tag> --repo <owner>/<repo> --target <sha> --title '<...>' --n
 gh release view <tag> --repo <owner>/<repo> --json tagName,targetCommitish,isDraft,assets
 ```
 
-If the tag does not exist, it is created at `--target`. If it does exist, it is reused, so a mistyped tag publishes against whatever commit already carries it. Read the release back and compare `targetCommitish` against the commit you meant.
+A tag that does not exist is created at `--target`. A tag that does exist is reused, so a mistyped tag publishes against whatever commit already carries it. Read the release back and compare `targetCommitish` against the commit you meant. `--draft` keeps the release invisible until someone publishes it, and `--prerelease` marks it without hiding it.
 
-`--draft` keeps the release invisible until someone publishes it. `--prerelease` marks it without hiding it.
+A tag fixes two things. It sets the commit the release page describes, and it sets what the automatically generated Source code archives contain, because GitHub builds those from the tag when someone downloads them rather than from the branch. A tag sitting behind `main` therefore serves old code as the download while the hand-uploaded assets hold the new files, and the release page carries both under one version number. Read `GET /git/refs/tags/<tag>` and `GET /git/refs/heads/main` before publishing. When the two SHAs differ, cut a new tag on the current head; moving the old one keeps the assets in place and leaves the earlier archives holding files nobody can reach.
 
-Attached files are objects of their own, not part of the tree, so moving the tag later leaves them as they were. `gh release upload <tag> <file> --repo <owner>/<repo>` adds one; the same name twice fails 422 `already_exists`, and `--clobber` replaces it. Over REST the host is `uploads.github.com`, not `api.github.com`: `POST /repos/<owner>/<repo>/releases/<id>/assets?name=<name>` with `--data-binary @<file>` and a `Content-Type` header. Replacing one means `DELETE /releases/assets/<id>` first, which returns 204 and no body.
+Attached files are objects of their own, not part of the tree, so moving the tag leaves them where they were. `gh release upload <tag> <file> --repo <owner>/<repo>` adds one, the same name twice fails 422 `already_exists`, and `--clobber` replaces it. Over REST the host is `uploads.github.com` rather than `api.github.com`: `POST /repos/<owner>/<repo>/releases/<id>/assets?name=<name>` with `--data-binary @<file>` and a `Content-Type` header. Replacing one means `DELETE /releases/assets/<id>` first, which returns 204 with no body.
 
 Deleting a release leaves the tag behind. Removing both takes two calls, and both belong to Step 10.
 
+## Step 9.5 — Making the repository findable
+
+A repository nobody can search for is a repository nobody installs. None of these fields sits in a commit, so they are set after the files land.
+
+| Field | Endpoint | Permission |
+|---|---|---|
+| description, homepage | `PATCH /repos/<owner>/<repo>` | Administration: write |
+| has_discussions, has_issues, has_wiki, has_projects | `PATCH /repos/<owner>/<repo>` | Administration: write |
+| default_branch | `PATCH /repos/<owner>/<repo>` | Administration: write |
+| topics | `PUT /repos/<owner>/<repo>/topics` | Administration: write |
+| social preview image | none | none |
+
+Topics are the one field that does not go through `PATCH /repos/<owner>/<repo>`. That request accepts the field, answers 200 and returns the old list unchanged, so a caller trusting the status code reports success over a write that never happened. Use `PUT /repos/<owner>/<repo>/topics` with `{"names": [...]}`, which replaces the entire list.
+
+Three rules come back as 422 with `must start with a lowercase letter or number, consist of 50 characters or less, and can include hyphens`:
+
+- At most 20 topics on a repository.
+- Lowercase letters, digits and hyphens only. `Agent Skills` is rejected.
+- The order you send is not kept, and no topic weighs more than another. The response comes back alphabetised.
+
+Read the field back and compare it against what you sent, because the wrong endpoint answers 200 while changing nothing.
+
+Which topics to pick is a question about which list a person scrolls, not about keywords. A topic holding a hundred thousand repositories buries a new entry on page forty; one holding six thousand leaves it on the first page for months. Two accurate small topics beat six broad ones, and search ranks on the description and the name far more than on topics.
+
+The social preview image has no REST endpoint and no GraphQL mutation. `GET /repos/<owner>/<repo>` omits the field, GraphQL exposes it read-only as `openGraphImageUrl`, and `gh repo edit` carries no flag for it. The user opens `https://github.com/<owner>/<repo>/settings`, finds Social preview and picks a file; say that rather than scripting around it. The image wants 1280×640, PNG or JPEG, under 1 MB, and it is what every link to the repository renders as in a chat client or on a social timeline.
+
+An issue template lives in `.github/ISSUE_TEMPLATE/` and is a file in the tree, so Step 3 or Step 4 writes it. Two files do the work: one or more `*.yml` forms, and a `config.yml` whose `blank_issues_enabled: false` removes the empty option and whose `contact_links` sends questions somewhere else. The community profile endpoint reports `issue_template` as missing when the directory holds only a form, so `config.yml` is what closes that gap.
+
+A public repository is ready when the files sit on the default branch, the release tag sits on that same commit, the assets read back with the expected bytes, the topics are set, the description is filled, an issue template sits beside a `config.yml`, and Discussions is either configured or deliberately off. Every item is confirmed by reading it back, because a 200 is not evidence that a field changed.
+
 ## Step 10 — Deleting and other irreversible changes
 
-Covers: deleting a repository, a branch, a file, a directory, or a release; changing visibility; changing the default branch; force-pushing; transferring ownership.
+Covers deleting a repository, a branch, a file, a directory or a release; changing visibility; changing the default branch; force-pushing; transferring ownership.
 
 ### The rule
 
-A user asking for a deletion is a request to plan one, not permission to run one. Do not call any endpoint that removes something until a confirmation arrives, and only for the items that confirmation names.
+A user asking for a deletion is asking for a plan, and the plan runs only after a confirmation arrives, only for the items that confirmation names.
 
 ### Sequence
 
 1. Read the current state of everything in scope and state it back in one short block: repository, branch, path, size, last commit, visibility.
-2. Produce a numbered list of what would be removed, one line per item. Include every item the phrasing could reach, not just the first one that came to mind. Mark items you believe are out of scope, so the user can rule them in.
-3. State what is not covered by the list — other branches, forks, local copies, open pull requests, releases, tags, CI artifacts.
-4. State where a copy exists. When none exists, say that outright instead of implying one.
-5. Ask the user to name the numbers. "All" still needs the list acknowledged once, since the list is what will actually run and "all" is a shorthand for it.
-6. Execute one item at a time. After each, read the object back and report the status code and what the API now returns.
-7. Stop after the named items. Do not continue to the rest because they were in the same list.
+2. Produce a numbered list of what would be removed, one line per item. Include every item the phrasing could reach rather than the first one that came to mind, and mark the ones you believe are out of scope so the user can rule them in.
+3. State what the list does not cover: other branches, forks, local copies, open pull requests, releases, tags, CI artifacts.
+4. State where a copy exists, and say outright when none does.
+5. Ask the user to name the numbers. "All" still needs the list acknowledged once, since the list is what will run.
+6. Execute one item at a time, reading each object back afterwards and reporting the status code with what the API now returns.
+7. Stop after the named items, even when the rest sat in the same list.
 
-Words that count as confirmation: 确认, 删, 做吧, 可以删, yes, go ahead, delete it. Words that do not: ok, 好的, 嗯, a question about something else, silence. A confirmation for item 2 covers item 2 only.
+Words that count as confirmation: 确认, 删, 做吧, 可以删, yes, go ahead, delete it. Words that do not: ok, 好的, 嗯, a question about something else, silence. A confirmation for item 2 covers item 2 alone.
 
-Shape of the message, filled in from the two reads above:
+Shape of the message, filled in from the reads above:
 
 ```
 You asked to remove: <restate the request in one line>
@@ -269,59 +287,55 @@ Reply with the numbers to remove. Everything not named stays.
 
 The same sentence can point at three different places, and deleting the wrong one is how a working copy disappears:
 
-- The remote repository. `DELETE /repos/<owner>/<repo>` removes the repository, its issues, pull requests, releases, and every fork loses its parent link.
-- Something inside the remote repository. A branch (`DELETE /git/refs/heads/<branch>`), a file or directory (Step 4 with `sha: null`, one commit), a release (`DELETE /releases/<id>`), a tag (`DELETE /git/refs/tags/<tag>`).
+- The remote repository. `DELETE /repos/<owner>/<repo>` removes the repository, its issues, its pull requests and its releases, and every fork loses its parent link.
+- Something inside the remote repository: a branch (`DELETE /git/refs/heads/<branch>`), a file or directory (Step 4 with `sha: null`, one commit), a release (`DELETE /releases/<id>`), a tag (`DELETE /git/refs/tags/<tag>`).
 - A path on the local machine. `rm -rf` on a workspace directory, a clone, a cache. Nothing on GitHub changes, and GitHub cannot restore it.
 
-When a request mixes two of these — "delete the test repo and the local clone" — split them into separate numbered items and treat them as separate confirmations. A single yes does not cover both, because the two failures are not the same size and the second one is unrecoverable.
+A request mixing two of these — "delete the test repo and the local clone" — splits into separate numbered items and separate confirmations, because the two failures are not the same size and the second one is unrecoverable.
 
-Before running any local `rm -rf`, list the absolute path and the file count, and confirm the path resolves where you think it does. A relative path that matched nothing, or matched the parent, both print the same success.
+Before running any local `rm -rf`, list the absolute path and the file count, and confirm the path resolves where you think it does. A relative path matching nothing and a relative path matching the parent both print the same success.
 
 ### Permissions
 
-`DELETE /repos/...` needs `delete_repo` on a classic token, or `Administration: write` on a fine-grained one. Missing it returns 403. A fine-grained token can be edited to add the permission and keeps its value; a classic token cannot gain a scope after it is issued, so it has to be regenerated.
+`DELETE /repos/...` needs `delete_repo` on a classic token, or `Administration: write` on a fine-grained one, and missing it returns 403. A fine-grained token can be edited to add the permission and keeps its value; a classic token cannot gain a scope after it is issued, so it has to be regenerated.
 
-Changing visibility to private breaks every anonymous reader: forks, badges, integrations, documentation links. Say it before the call, once.
+Changing visibility to private breaks every anonymous reader: forks, badges, integrations, documentation links. Say it before the call, once. Changing the default branch changes what every clone checks out and what every workflow triggers on, so list the branch that becomes default and the one that stops being it.
 
-Changing the default branch silently changes what every clone and every workflow triggers on. List the branch that becomes default and the one that stops being it.
+Ordinary settings go through the endpoints in Step 9.5: description, homepage and the booleans through `PATCH /repos/<owner>/<repo>`, topics through `PUT /repos/<owner>/<repo>/topics`. Both are reversible, though a changed merge policy alters what every later pull request can do.
 
-Ordinary settings — description, homepage, topics, merge options — go through `PATCH /repos/<owner>/<repo>`. They are reversible, though a changed merge policy alters what every later pull request can do. Visibility and default branch stay under this section; the rest is an ordinary write with a report at the end.
-
-The permission each field needs is on the fine-grained list at https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens. `Administration: write` covers the widest set, including deletion.
+The permission each field needs is on the fine-grained list at https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens. `Administration: write` covers the widest set, including deletion, so setting a topic and deleting the repository are the same permission.
 
 ## Step 11 — When an action fails
 
-Read the status code first; the body is often generic.
+Read the status code first, since the body is often generic. Then read `x-accepted-github-permissions` off the response: every REST response carries it, naming the permission and level the endpoint checks — `contents=write`, `administration=read`, `secrets=read` — which answers the permission question without a guess. A header naming a permission the token already holds means the permission is not the problem, so check the repository selection, then whether an organization has approved the token.
 
-Then read `x-accepted-github-permissions` off the response. Every REST response carries it, naming the permission and level the endpoint checks — `contents=write`, `administration=read`, `secrets=read`. It answers "which permission" without a guess. A header naming a permission the token already holds means the permission is not the problem: check the repository selection, then whether an organization has approved the token.
-
-- `401` — the credential is absent, malformed, revoked or expired. This belongs to `github-onboard`; reissuing is the fix, retrying is not.
-- `403` `Resource not accessible by personal access token` — a fine-grained token was refused. The header names the permission; add it, or raise its level. Only when no fine-grained permission exists for the operation does the type have to change, and `github-onboard` 3.4 lists those six cases.
-- `403` with `X-GitHub-SSO` — the organization has not authorized this token. The user clears it on the organization's SSO page; nothing on this side changes it.
-- `403` with `rate limit` in the body — read `X-RateLimit-Reset`, wait, retry once. Secondary limits send the same code without that header and want a pause, not a retry loop.
-- `404` on an object that exists in a browser — the credential lacks access. GitHub answers 404 instead of 403 on purpose. Recheck repository selection before telling anyone the object is gone.
-- `409` on a contents write — `sha` missing for an update, or stale because the file changed since you read it. Re-read and retry once.
+- `401` — the credential is absent, malformed, revoked or expired. This belongs to github-onboard; reissuing is the fix and retrying is not.
+- `403` `Resource not accessible by personal access token` — a fine-grained token was refused. The header names the permission; add it, or raise its level. Only when no fine-grained permission exists for the operation does the token type have to change, and github-onboard 3.4 lists those six cases.
+- `403` with `X-GitHub-SSO` — the organization has not authorized this token. The user clears it on the organization's SSO page, and nothing on this side changes it.
+- `403` carrying `rate limit` in the body — read `X-RateLimit-Reset`, wait, retry once. Secondary limits send the same code without that header and want a pause rather than a retry loop.
+- `404` on an object that exists in a browser — the credential lacks access, because GitHub answers 404 instead of 403 on purpose. Recheck the repository selection before telling anyone the object is gone.
+- `409` on a contents write — `sha` missing for an update, or stale because the file changed since the read. Re-read and retry once.
 - `422` on a ref, tree or commit — malformed input: `ref` without `refs/`, a tree entry without `mode`, a `base_tree` that is a commit SHA, or a parent that is not a commit.
-- `422` `Update is not a fast forward` on a ref move — the branch moved after you read its head. Re-read the head, rebuild the tree and the commit on top of it, and move again. Setting `force: true` skips the check and drops whatever arrived in between.
-- `5xx` — server side. Four attempts with backoff, then report the failure with the request that produced it.
+- `422` `Update is not a fast forward` on a ref move — the branch moved after its head was read. Re-read the head, rebuild the tree and the commit on top of it, and move again; `force: true` skips the check and drops whatever arrived in between.
+- `5xx` — server side. Four attempts with backoff, then report the failure along with the request that produced it.
 
-A timeout is not a failed request. The work may have completed after the connection dropped, and repeating it then builds a second commit on a parent that is no longer the head. Before repeating any write, read what the write was meant to change — `GET /git/ref/heads/<branch>`, compared against the head you started from. If it moved, the write landed. Report it as done and do not retry.
+A timeout is not a failed request. The work may have completed after the connection dropped, and repeating it then builds a second commit on a parent that is no longer the head. Before repeating any write, read what the write was meant to change — `GET /git/ref/heads/<branch>` against the head you started from — and when it moved, report the write as done without retrying.
 
-After two failures of the same call, stop varying parameters. Read the body once and match it against this list.
+After two failures of the same call, stop varying parameters, read the body once and match it against this list.
 
 ## Step 12 — Report
 
 After any write, three lines:
 
-1. What changed — object, field, old value, new value.
-2. How it was verified — the read that came back and what it showed.
-3. Next action — one command, one click, or nothing left.
+1. What changed: object, field, old value, new value.
+2. How it was verified: the read that came back and what it showed.
+3. Next action: one command, one click, or nothing left.
 
-A bare "done" does not say whether anything changed.
+A bare "done" leaves the reader unable to tell whether anything happened.
 
 ## Markdown bound for a repository
 
-A `.md` file is rendered wherever GitHub shows it, and the renderer reads `<` as the start of an HTML tag. A path written as `<your skills dir>/x` leaves a tag the renderer drops, and the code spans sharing that paragraph can be pulled to its end. On a phone that reads as a broken sentence followed by loose boxes, and the sentence no longer says anything.
+A `.md` file is rendered wherever GitHub shows it, and the renderer reads `<` as the start of an HTML tag. A path written as `<your skills dir>/x` leaves a tag the renderer drops, and the code spans sharing that paragraph can be pulled to its end. On a phone that reads as a broken sentence followed by a row of loose boxes.
 
 Four checks, one command each:
 
@@ -341,7 +355,9 @@ awk '/^```/{f=!f; next} !f && /^[[:space:]]*`[^`]+`[[:space:]]*$/{print FILENAME
 
 Write a path as `your skills dir/github-onboard/SKILL.md`, in a fenced block or inline, and leave the brackets off unless the sentence is about the brackets themselves.
 
-Two things the commands do not catch. A list whose items all begin with a noun (`Reads:`, `Writes:`, `Deletes:`) has no subject, and a reader landing in the middle of it has no sentence to parse; give every item a subject and a verb. And a byte count quoted beside a download link goes stale the moment that file changes: run `wc -c`, paste the number, and recheck it in the same commit that touches the file.
+A second failure belongs to the same family. A paragraph of Chinese carrying code spans can render with every span pushed to the paragraph's end, which reads as a sentence missing its nouns followed by a row of boxes. The server-side renderer places them correctly and the HTML shows nothing wrong, so the browser lays out the line afterwards; on a device that does this, replace the spans with bold text or move the value into a fenced block. Read the page on the device that will display it.
+
+Two things the commands do not catch. A list whose items all begin with a noun (`Reads:`, `Writes:`, `Deletes:`) has no subject, and a reader landing in the middle of it has no sentence to parse, so give every item a subject and a verb. And a byte count quoted beside a download link goes stale the moment that file changes: run `wc -c`, paste the number, and recheck it in the same commit that touches the file.
 
 `python3 -m markdown file.md` prints the HTML, after `pip install markdown` on a machine that lacks it. A paragraph holding several `<code>` runs in a row is the failure this section is about, and the HTML shows it before a phone does.
 
@@ -349,4 +365,4 @@ Two things the commands do not catch. A list whose items all begin with a noun (
 
 Do not echo a token, print its length, place it in a clone URL, or commit it. Pass it through an environment variable the shell already holds.
 
-If a token reaches a shared log, a chat transcript, or a committed file, say so once and recommend rotation.
+If a token reaches a shared log, a chat transcript or a committed file, say so once and recommend rotation.
