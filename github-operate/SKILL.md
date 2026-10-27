@@ -4,7 +4,7 @@ description: Operates on a GitHub repository once a credential works. Covers rea
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.2.1"
+  version: "1.2.0"
   source: https://github.com/88Lookingupatthestars88/agent-github-fieldguide
 ---
 
@@ -264,9 +264,9 @@ An issue template is a file in the tree, so Step 3 or Step 4 writes it. Where it
 | `pull_request_template` | `.github/PULL_REQUEST_TEMPLATE.md` |
 | `documentation` | a wiki page, or a Pages site |
 
-GitHub's help page gives four items at twenty-five points each. The number that comes back does not divide by four, so read `files` rather than working the score out.
+GitHub's help page gives four items at twenty-five points each. The number that comes back does not divide by four, so `files` is the part to read.
 
-`issue_template` takes one file at `.github/ISSUE_TEMPLATE.md`. A form at `.github/ISSUE_TEMPLATE/report.yml` with a `config.yml` beside it gives a working chooser and leaves that field `null`, so write the `null`-clearing file as well.
+`issue_template` takes one file at `.github/ISSUE_TEMPLATE.md`. A form at `.github/ISSUE_TEMPLATE/report.yml` with a `config.yml` beside it gives a working chooser and leaves that field `null`, so write both.
 
 `documentation` takes a wiki page or a Pages site. `has_wiki: true` on its own leaves the field `null`.
 
@@ -276,7 +276,7 @@ gh api -X POST repos/<owner>/<repo>/pages -f 'source[branch]=main' -f 'source[pa
 
 Pages publishes the whole branch and Jekyll renders `README.md` as the index. `documentation` fills on the next read. `health_percentage` lags several minutes, so a read taken straight after still returns the old number.
 
-A build failing with `Page build failed`, `duration: 0` and a 500 on the deployment is the deployment service rather than the content, and the next push retries it.
+A run ending in `Page build failed`, `duration: 0` and a 500 on the deployment had no content problem. GitHub's deployment service dropped it, and the next push runs it again.
 
 The percentage counts files. A `CONTRIBUTING.md` with no build steps in it scores the same as one that has them.
 

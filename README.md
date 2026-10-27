@@ -6,9 +6,9 @@
 
 ## 下载
 
-- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.1/github-onboard-SKILL.md) — 13299 B
-- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.1/github-operate-SKILL.md) — 29470 B
-- [agent-github-fieldguide-v1.2.1.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.1/agent-github-fieldguide-v1.2.1.zip) — 22327 B，两个 skill 连文件夹打包
+- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/github-onboard-SKILL.md) — 13299 B
+- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/github-operate-SKILL.md) — 29434 B
+- [agent-github-fieldguide-v1.2.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/agent-github-fieldguide-v1.2.0.zip) — 22320 B，两个 skill 连文件夹打包
 
 ## 装
 
