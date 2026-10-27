@@ -1,33 +1,28 @@
 ---
 name: github-operate
-description: Operates on a GitHub repository once a credential works. Covers reading files and trees, commits, branches, pull requests, issues, workflow runs, releases, repository settings, the community profile, security audit, and deletion. Use for any read or write against api.github.com or the gh CLI. 提交 / 建分支 / 开 PR / 提 issue / 看 CI / 发 release / 改仓库设置 / 健康分 / 审核 / 删仓库.
+description: Operates on a GitHub repository once a credential works. Covers reading files and trees, commits, branches, pull requests, issues, workflow runs, releases, repository settings, the community profile, auditing what a repository exposes, taking an identity out of history, and deletion. Use for any read or write against api.github.com or the gh CLI. 提交 / 建分支 / 开 PR / 提 issue / 看 CI / 发 release / 改仓库设置 / 健康分 / 审核 / 查历史里的邮箱 / 删仓库.
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.2.0"
+  version: "1.3.0"
   source: https://github.com/88Lookingupatthestars88/agent-github-fieldguide
 ---
 
 # GitHub Operations
 
-A working credential is assumed. When there is none, github-onboard comes first. Authentication errors stay there; this file starts at permissions and objects.
+A working credential is assumed. Without one, github-onboard comes first. Authentication failures stay there; this file starts at permissions and objects.
 
 ## Step 0 — What you can call
 
-Three routes reach the same API, and which one exists decides the shape of every command below.
+Three routes reach the same API, and the one that exists decides the shape of every command below.
 
-- MCP tools are loaded. Take tool names from the server, and use this route when one call covers the job.
+- MCP tools are loaded. Take names from the server, and use this route where one call covers the job.
 - A shell with `gh`. Confirm with `gh --version`.
-- A shell without `gh`, where HTTPS works. A bearer header does everything the other two do.
+- A shell without `gh`, where HTTPS works. A bearer header covers what the other two do.
 
-Every command below is written in the `gh` form. Raw HTTPS replaces `gh api <path>` with a request to `https://api.github.com/<path>` plus `Authorization: Bearer`, and replaces `-f k=v` with a JSON body field. `--jq` is a client-side filter with no server equivalent.
+Commands below are written in the `gh` form. Raw HTTPS replaces `gh api <path>` with a request to `https://api.github.com/<path>` plus `Authorization: Bearer`, and `-f k=v` with a JSON body field. `--jq` is a client-side filter with no server equivalent. Pick one route and keep it for the session; switching halfway means reading the object again through the new route.
 
-Pick one route and keep it for the session. Switching halfway means re-reading the object through the new route.
-
-- `base64 -w0` is GNU; macOS wraps, and `openssl base64 -A` works on both.
-- No heredocs in `cmd.exe` or PowerShell. Write the JSON to a file and pass `--input`.
-- `gh --jq` carries its own filter, so nothing here calls `jq`.
-- `-f` makes every value a string and `-F` keeps booleans typed. `-f draft=false` arrives as a string and a boolean field rejects it.
+Four platform facts break a command that ignores them: `base64 -w0` is GNU and macOS wraps, while `openssl base64 -A` runs on both; `cmd.exe` and PowerShell have no heredocs, so the JSON goes to a file and travels as `--input`; `gh --jq` carries its own filter, so nothing here calls `jq`; `-f` turns every value into a string and `-F` keeps booleans typed, so `-f draft=false` arrives as a string that a boolean field rejects.
 
 ## Step 1 — Who you are acting as
 
@@ -36,7 +31,7 @@ gh api user --jq .login
 gh api repos/<owner>/<repo> --jq '{perm: .permissions, default: .default_branch, private: .private}'
 ```
 
-`permissions` reports `admin`, `maintain`, `push`, `triage` and `pull` as booleans. Read them rather than probing with a write. Write access and visibility are separate: `push: true` on a public repository still means every read is anonymous unless the token travels with it.
+`permissions` reports `admin`, `maintain`, `push`, `triage` and `pull` as booleans. Read them rather than probing with a write. Write access and visibility are separate: `push: true` on a public repository still makes every read anonymous unless the token travels with it.
 
 ## Step 2 — Reading
 
@@ -69,7 +64,7 @@ gh api -X PUT repos/<owner>/<repo>/contents/<path> \
   -f branch='<branch>'
 ```
 
-A 404 on the read means the file does not exist, so the PUT carries no `sha` at all. An empty `sha=""` is a bad value and returns 422. Pass `branch` every time, or the write lands on the default branch.
+A 404 on the read means the file is absent, so the PUT carries no `sha` at all. An empty `sha=""` is a bad value and returns 422, and leaving `sha` off a file that exists returns 422 with `"sha" wasn't supplied`. Pass `branch` every time, or the write lands on the default branch.
 
 The `message` becomes permanent history, so one line saying what changed and why.
 
@@ -120,9 +115,9 @@ Drop `base_tree` and the call means the opposite: the tree becomes exactly what 
 gh api 'repos/<owner>/<repo>/git/trees/<new-tree>?recursive=1' --jq '.tree[]|select(.type=="blob")|.path' | sort > got.txt
 ```
 
-Compare that against the previous blob paths plus the ones you added, minus the ones you removed. A count taken from the request only repeats what you asked for.
+Compare that against the previous blob paths, plus the ones you added, minus the ones you removed; a count taken from the request only repeats what you asked for.
 
-When one change moves both a branch and a tag, move the branch first and confirm it. A tag moved first stays on the new commit even when the branch move is rejected, and ends up on a commit no branch reaches. `git/ref/heads/<branch>` returns a commit SHA, and feeding that to `base_tree` returns 422; the tree SHA comes from the second read.
+`git/ref/heads/<branch>` returns a commit SHA, and feeding that to `base_tree` returns 422; the tree SHA comes from the second read. When one change moves both a branch and a tag, move the branch first: a tag moved first stays on the new commit even when the branch move is rejected, and ends up on a commit no branch reaches.
 
 ## Step 5 — Branches
 
@@ -184,43 +179,21 @@ gh release create <tag> --repo <owner>/<repo> --target <sha> --title '<...>' --n
 gh release view <tag> --repo <owner>/<repo> --json tagName,targetCommitish,isDraft,assets
 ```
 
-A tag that does not exist is created at `--target`. An existing tag is reused, so a mistyped tag publishes against whatever commit carries it. Read the release back and compare `targetCommitish`.
+A tag names the commit the release page describes, and GitHub builds the source archives from the tag at download time, not from the branch. Read `GET /git/refs/tags/<tag>` and `GET /git/refs/heads/main` before publishing. When they differ, cut a new tag on the current head. Moving an old tag rewrites what its release page describes and what its source archives contain, so a download labelled 1.1 arrives holding newer files. A tag that does not exist is created at `--target`. An existing tag is reused, so a mistyped tag publishes against whatever commit carries it; read `targetCommitish` back.
 
-A tag fixes two things: the commit the release page describes, and what the generated source archives contain, because GitHub builds those from the tag on download rather than from the branch. Read `GET /git/refs/tags/<tag>` and `GET /git/refs/heads/main` before publishing. When they differ, cut a new tag on the current head; moving an old one leaves the earlier archives holding files nobody can reach.
+Attached files are objects of their own and survive a tag move. `gh release upload <tag> <file>` adds one; the same name twice fails 422 `already_exists`, and `--clobber` replaces it. Over REST the host is `uploads.github.com`: `POST /repos/<owner>/<repo>/releases/<id>/assets?name=<name>` with `--data-binary @<file>`. Replacing one means `DELETE /releases/assets/<id>` first, which answers 204.
 
-Attached files are objects of their own, not part of the tree, so moving the tag leaves them in place. `gh release upload <tag> <file>` adds one, the same name twice fails 422 `already_exists`, and `--clobber` replaces it. Over REST the host is `uploads.github.com`: `POST /repos/<owner>/<repo>/releases/<id>/assets?name=<name>` with `--data-binary @<file>`. Replacing one means `DELETE /releases/assets/<id>` first, which returns 204.
+Publishing 1.3 does not remove 1.2. A release is a link someone may already have open or cited, and the page listing every version is how a reader pins one. `/releases/latest/download/<file>` follows the newest release, so download links in a readme survive a bump without an edit. Deleting a release takes its download links out of service, which makes it a Step 10 item with a numbered list and a named confirmation, even when the agent published the version minutes earlier.
 
-### A new version does not replace the old one
+The working tree holds the current version and nothing else. A released version stays downloadable from its release page, so a directory beside the tree goes stale the first time the tree is edited. Build the package in a scratch directory, upload it, verify the bytes, delete it.
 
-Publishing 1.2 does not remove 1.1. A release is a download link someone may already have open, cited, or built into their own setup, and the page listing every version is what lets a reader pin one and choose the upgrade.
-
-So a version bump is one call:
-
-```sh
-gh release create <new-tag> --repo <owner>/<repo> --target <sha> --title '<...>' --notes '<...>'
-```
-
-The old tag keeps its commit and its source archives keep building from it, which is correct: someone downloading 1.1 wants 1.1. A tag behind `main` is not a defect to fix by moving; it is what a released version is. Fixes go into a new tag, and the old one stays readable so the difference between them can be seen.
-
-`latest` moves to the newest release by itself, and `/releases/latest/download/<file>` follows it, so a readme's download links survive a bump without an edit.
-
-Removing a release, or a tag with it, is a deletion and needs a named confirmation under Step 10, even when the agent published that version minutes earlier and even when the replacement is byte-identical. Withdraw a version that leaks a credential or breaks machines; say which and why, then wait.
-
-### One copy on disk
-
-The working tree holds the current version and nothing else. A released version lives on its release page, where the tag, the source archives and the assets stay downloadable, so a directory beside the tree adds nothing and goes stale the first time the tree is edited. Two copies of one version number, one of them stale, is how a reader ends up comparing the wrong file.
-
-Build the package in a scratch directory, upload it, verify the bytes, delete it. Reading an old version back means downloading it, not keeping a folder in reserve.
-
-### Is this copy current
-
-`metadata.version` above is the release this copy shipped with, the tag without its `v`, and `metadata.source` is where it came from. One call answers whether it is still the newest:
+`metadata.version` above is the release this copy shipped with and `metadata.source` is where it came from. One call says whether a newer one exists:
 
 ```sh
 gh api repos/88Lookingupatthestars88/agent-github-fieldguide/releases/latest --jq '.tag_name, .published_at'
 ```
 
-A tag above that number means this copy is older than what shipped. Report both numbers and let the user decide; replacing the file is their edit. The older release stays downloadable, so a pinned version keeps working.
+A tag above that number means this copy is behind. Report both numbers; replacing the file is the user's edit.
 
 ## Step 9.5 — Repository settings
 
@@ -234,13 +207,9 @@ None of these fields sits in a commit, so they are set after the files land.
 | topics | `PUT /repos/<owner>/<repo>/topics` | Administration: write |
 | social preview image | no endpoint | none |
 
-Topics are the field that does not go through `PATCH /repos/<owner>/<repo>`. That request accepts the field, answers 200 and returns the old list unchanged, so a caller trusting the status code reports success over a write that never happened. Use `PUT` with `{"names": [...]}`, which replaces the whole list.
+Topics do not go through `PATCH /repos/<owner>/<repo>`. That request accepts the field, answers 200 and returns the old list unchanged, so a caller trusting the status code reports success over a write that never happened. Use `PUT` with `{"names": [...]}`, which replaces the whole list.
 
-Three rules come back as 422 with `must start with a lowercase letter or number, consist of 50 characters or less, and can include hyphens`:
-
-- At most 20 topics.
-- Lowercase letters, digits and hyphens only.
-- Order is not kept. The response comes back alphabetised, and no topic weighs more than another.
+Three rules come back as 422 with `must start with a lowercase letter or number, consist of 50 characters or less, and can include hyphens`: at most 20 topics; lowercase letters, digits and hyphens only; order is not kept, and the response comes back alphabetised with no topic weighing more than another.
 
 Read the field back and compare, because the wrong endpoint answers 200 while changing nothing.
 
@@ -264,17 +233,15 @@ An issue template is a file in the tree, so Step 3 or Step 4 writes it. Where it
 | `pull_request_template` | `.github/PULL_REQUEST_TEMPLATE.md` |
 | `documentation` | a wiki page, or a Pages site |
 
-GitHub's help page gives four items at twenty-five points each. The number that comes back does not divide by four, so `files` is the part to read.
+The percentage does not divide evenly by the number of entries. On this repository the observed steps were 42 with a readme and a licence, 71 after CONTRIBUTING and CODE_OF_CONDUCT, 85 after the pull request template, and 100 after Pages. Read `files` for what is missing rather than deriving it from the number.
 
-`issue_template` takes one file at `.github/ISSUE_TEMPLATE.md`. A form at `.github/ISSUE_TEMPLATE/report.yml` with a `config.yml` beside it gives a working chooser and leaves that field `null`, so write both.
-
-`documentation` takes a wiki page or a Pages site. `has_wiki: true` on its own leaves the field `null`.
+`issue_template` takes one file at `.github/ISSUE_TEMPLATE.md`. A form at `.github/ISSUE_TEMPLATE/report.yml` with a `config.yml` beside it gives a working chooser and leaves that field `null`, so write both. `documentation` takes a wiki page or a Pages site, and `has_wiki: true` on its own leaves the field `null`.
 
 ```sh
 gh api -X POST repos/<owner>/<repo>/pages -f 'source[branch]=main' -f 'source[path]=/'
 ```
 
-Pages publishes the whole branch and Jekyll renders `README.md` as the index. `documentation` fills on the next read. `health_percentage` lags several minutes, so a read taken straight after still returns the old number.
+Pages publishes the whole branch and Jekyll renders `README.md` as the index. `documentation` fills on the next read, and `health_percentage` lags several minutes, so a read taken straight after still returns the old number.
 
 A run ending in `Page build failed`, `duration: 0` and a 500 on the deployment had no content problem. GitHub's deployment service dropped it, and the next push runs it again.
 
@@ -282,20 +249,83 @@ The percentage counts files. A `CONTRIBUTING.md` with no build steps in it score
 
 ## Step 9.7 — Auditing a repository
 
-Run this before a repository goes public, and again whenever a token, a collaborator or a workflow changes. Several of these features answer 404 when they are off, so read the field rather than the status code.
+Run this before a repository goes public, and again whenever a token, a collaborator or a workflow changes. Several of these answer 404 or 403 when the feature is off, so read the field as well as the status code.
 
-1. **A credential in the tree or in history.** `GET /secret-scanning/alerts` answers on a public repository with no setup; a private one needs the permission and answers 403 without it. Where it is unavailable, walk `git/trees?recursive=1` and grep the blobs, then check history separately, because deleting a file leaves the blob reachable.
-2. **The licence actually carried.** `GET /repos/<owner>/<repo>` → `.license.spdx_id`. `null` means no licence file exists however the readme reads, and no licence means nobody may copy it. Apache-2.0 with a `NOTICE` file means `NOTICE` travels with every redistribution.
-3. **Whether workflows run code that can move.** `GET /actions/permissions` → `sha_pinning_required`. False by default, so `uses: owner/action@v4` executes whatever that tag points at on the day it runs. Only a full forty-character SHA is fixed, so pin third-party actions to one.
-4. **What a workflow's token may do.** `GET /actions/permissions/workflow` → `default_workflow_permissions`. `read` is the floor; `write` lets any workflow push to any branch. A job needing more requests it in its own `permissions:` block.
-5. **Whether the default branch survives a mistake.** `GET /branches/<branch>/protection` answering 404 means unprotected, and an unprotected branch takes force-pushes and deletions from any token holding write.
-6. **Whether a stranger can report a vulnerability privately.** `GET /private-vulnerability-reporting` reads `{"enabled": false}` on a new repository, and a `PUT` with `{"enabled": true}` turns it on. A `SECURITY.md` naming an address does not.
-7. **Whether advisories arrive.** `GET /vulnerability-alerts` answers 404 and `GET /dependabot/alerts` answers 403 when off. Alerts and security updates are separate switches, both off on a new repository: `PUT /vulnerability-alerts` for the first, `security_and_analysis.dependabot_security_updates` for the second. With no dependency file the pair is moot.
-8. **What Pages serves.** `GET /pages` → `visibility`. A private repository with a public Pages site exposes its files whatever the repository setting says.
-9. **What else reaches the repository.** `GET /keys` and `GET /hooks`. Both returning `[]` is normal; a deploy key or a webhook nobody remembers adding survives a token rotation.
-10. **How far the token reaches.** No endpoint lists a token's scopes. `x-accepted-github-permissions` names what each call needed, so the union across a session is the set it used. Compare that against what the session was for: `administration: write` carries deleting the repository.
+| What | Call | Value that needs action |
+|---|---|---|
+| A secret in the tree | `GET /secret-scanning/alerts` | any alert. A private repository answers 403; fall back to `git/trees?recursive=1` and grep the blobs |
+| The identity on each commit | `git log --all --format='%an <%ae> \| %cn <%ce>'` | an address the author did not mean to publish |
+| Paths that used to exist | `git log --all --diff-filter=D --name-only --pretty=format:` | a path name describing internal work |
+| Commit messages | `git log --all --format=%s` | `probe:`, `wip`, `test`, anything naming a private plan |
+| The licence carried | `GET /repos/<owner>/<repo>` → `.license.spdx_id` | `null`, which means nobody may copy it however the readme reads |
+| Workflow code that can move | `GET /actions/permissions` → `sha_pinning_required` | `false`, which lets `uses: owner/action@v4` run whatever that tag points at that day |
+| What a workflow token may do | `GET /actions/permissions/workflow` → `default_workflow_permissions` | `write`, which lets any workflow push to any branch |
+| The default branch under a mistake | `GET /branches/<branch>/protection` | 404, meaning unprotected and open to force-pushes from any token holding write |
+| Private vulnerability reporting | `GET /private-vulnerability-reporting` | `{"enabled": false}`, which leaves no private route for a report, and a `SECURITY.md` naming an address does not open one |
+| Dependency alerts | `GET /vulnerability-alerts`, `GET /dependabot/alerts` | 404 and 403, both meaning off |
+| What Pages serves | `GET /pages` → `public` | `true` on a private repository, which serves its files to anyone |
+| What else reaches the repository | `GET /keys`, `GET /hooks` | an entry nobody remembers adding, which survives a token rotation |
+| What the account publishes beside it | `/users/<owner>/events/public`, `/users/<owner>/{keys,gists,starred,social_accounts}` | an old push head, or an account detail the owner forgot |
+
+The tree API reads file content and nothing else, so a scan built only on `git/trees` returns zero findings on a repository that publishes a personal address. Author and committer are fields on the commit object. `GET /commits` normalises every date to `Z`, so the author's time offset never appears there; it survives only in `git log` and in `search/commits`.
+
+Three channels keep an old SHA or an old identity reachable after it has left the files, and each closes on its own schedule:
+
+- `GET /commits/<old-sha>` answers 200 until GitHub collects the objects. Only a request to support clears that sooner.
+- `search/commits?q=author-email:<old>` keeps returning the old rows until the index rebuilds. On a 34-commit repository this took twelve minutes.
+- `/users/<owner>/events/public` keeps the push heads recorded before a rewrite for ninety days.
+
+Two switches need `Administration: write` and take an empty body:
+
+```sh
+curl -X PUT -H "Authorization: Bearer $TOKEN" \
+  https://api.github.com/repos/<owner>/<repo>/private-vulnerability-reporting
+curl -X PUT -H "Authorization: Bearer $TOKEN" \
+  https://api.github.com/repos/<owner>/<repo>/vulnerability-alerts
+```
+
+The first answers 204. The second enables Dependabot alerts; security updates are a separate switch set through `security_and_analysis.dependabot_security_updates` on `PATCH /repos/<owner>/<repo>`. With no manifest in the tree, both are moot.
+
+No endpoint lists a token's scopes. Every authenticated response carries `x-accepted-github-permissions`, which names what that call needed, and the union across a session is the set the token used. Compare that against what the session was for: `administration=write` carries deleting the repository.
 
 Three lines per finding: the field, its current value, and the one call that changes it. A decision belonging to the owner — which licence, whether the repository should be private — gets named as a decision rather than made.
+
+## Step 9.8 — Taking an identity out of history
+
+A commit SHA is computed over its tree, its parents, the author and committer fields, and the message, so changing one address on an old commit changes that SHA and every commit after it. Adding a commit leaves the old ones untouched, and the account's private-email setting applies only to commits made after it is switched on. Count forks first with `GET /repos/<owner>/<repo>/forks`; a fork keeps the old objects, and after one exists the rewrite stops removing the address from anywhere but the parent repository.
+
+```sh
+git clone https://github.com/<owner>/<repo> work && cd work
+git bundle create ../pre-rewrite.bundle --all && git bundle verify ../pre-rewrite.bundle
+git rev-parse 'HEAD^{tree}'                   # compare again after the rewrite
+FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --env-filter '
+NR="<id>+<login>@users.noreply.github.com"
+[ "$GIT_AUTHOR_EMAIL" = "old@example.com" ] && export GIT_AUTHOR_EMAIL="$NR"
+[ "$GIT_COMMITTER_EMAIL" = "old@example.com" ] && export GIT_COMMITTER_EMAIL="$NR"
+' -- --all
+git for-each-ref --format='%(refname)' refs/original | xargs -r -n1 git update-ref -d
+```
+
+The filter sets the two address variables and touches nothing else, so dates and names survive. `refs/original/*` has to go, or `git log --all` still reaches the old objects.
+
+Push with one lease per ref, so a ref that moved meanwhile refuses rather than overwrites:
+
+```sh
+git push --force-with-lease=refs/heads/main:<old> \
+         --force-with-lease=refs/tags/v1.2.0:<old> \
+         origin refs/heads/main refs/tags/v1.2.0
+```
+
+Four reads decide whether the rewrite worked:
+
+1. `HEAD^{tree}` matches the value read before it. Only the identity changed.
+2. `git log --format='%ae' | sort -u` prints one address.
+3. `GET /releases` keeps the same `tag_name`, the same asset count and the same `download_count`.
+4. `GET /tarball/refs/tags/<tag>` unpacks to a top-level directory ending in the new SHA, which is how the archive on the release page is shown to be new.
+
+A rewritten commit is unsigned, so an Initial commit GitHub signed through the web editor loses its verified badge and reads as Unverified. There is no way back short of signing it again.
+
+Report which of the three residue channels has cleared. Calling the address gone before all three do is a false report.
 
 ## Step 10 — Deleting and irreversible changes
 
@@ -318,15 +348,12 @@ Words that count as confirmation: 确认, 删, 做吧, 可以删, yes, go ahead,
 ```
 You asked to remove: <one line>
 Now: <owner/repo>, <branch or path>, <size>, last commit <sha> <date>, <visibility>
-
 Would be removed:
 1. <object> — <what goes with it>
 2. <object> — <what goes with it>
 3. <object> — <out of scope, listed so you can rule it in>
-
 Not in this list: <other branches, forks, local copies, releases, tags>
 A copy exists at: <path> | none
-
 Reply with the numbers to remove. Everything not named stays.
 ```
 
@@ -350,15 +377,15 @@ Ordinary settings go through Step 9.5 and are reversible, though a changed merge
 
 ## Step 11 — When an action fails
 
-Read the status code first, since the body is often generic. Then read `x-accepted-github-permissions`, which every REST response carries: it names the permission and level the endpoint checks, such as `contents=write` or `administration=read`. A header naming a permission the token already holds means the permission is not the problem, so check the repository selection, then whether an organization has approved the token.
+Read the status code first, since the body is often generic. Then read `x-accepted-github-permissions`, which every authenticated response carries, 404 included: it names the permission and level the endpoint checks, such as `contents=read` or `administration=read`. A 401 carries no such header, which is how a bad credential is told apart from a credential that lacks a permission. A header naming a permission the token already holds means the permission is not the problem, so check the repository selection, then whether an organization has approved the token.
 
 - `401` — the credential is absent, malformed, revoked or expired. github-onboard owns that; reissuing is the fix and retrying is not.
 - `403 Resource not accessible by personal access token` — a fine-grained token was refused. The header names the permission; add it or raise its level. Only when no fine-grained permission exists for the operation does the token type change.
 - `403` with `X-GitHub-SSO` — the organization has not authorized this token. The user clears it on the organization's SSO page.
 - `403` carrying `rate limit` — read `X-RateLimit-Reset`, wait, retry once. Secondary limits send the same code without that header and want a pause.
 - `404` on an object that exists in a browser — the credential lacks access, because GitHub answers 404 instead of 403 on purpose.
-- `409` on a contents write — `sha` missing, or stale because the file changed since the read. Re-read and retry once.
-- `422` on a ref, tree or commit — malformed input: `ref` without `refs/`, a tree entry without `mode`, a `base_tree` that is a commit SHA, a parent that is not a commit.
+- `409` on a contents write — the `sha` you sent is stale because the file changed since the read. Re-read and retry once.
+- `422 Invalid request` — malformed input: `ref` without `refs/`, a tree entry without `mode`, a `base_tree` that is a commit SHA, a parent that is not a commit. A contents write that omits `sha` for a file that exists lands here with `"sha" wasn't supplied`.
 - `422 Update is not a fast forward` — the branch moved after its head was read. Re-read the head, rebuild on top of it, move again.
 - `5xx` — server side. Four attempts with backoff, then report the failure with the request that produced it.
 
@@ -380,9 +407,9 @@ Four things leave the repository carrying text: the commit message, the release 
 
 **Commit message.** One line, under seventy characters, saying what changed. The diff already shows where, so the line carries the reason.
 
-**Release notes.** The reader is deciding whether to download. Say what changed for them in their words, say what they have to do, and keep it to one paragraph. Field names, endpoint names and the reason a design was chosen stay out. A change the user cannot see gets no line here; report it in the conversation. No inline code in a release body, because GitHub's machine translation pushes every code span to the end of its paragraph and the sentence arrives full of holes.
+**Release notes.** The reader is deciding whether to download. Say what changed for them, say what they have to do, and keep it to one paragraph. Field names, endpoint names and the reason a design was chosen stay out, and so does a change the user cannot see; report that one in the conversation. No inline code in a release body, because GitHub's machine translation pushes every code span to the end of its paragraph and the sentence arrives full of holes.
 
-**Readme.** Two readers arrive thirty seconds apart. The first is deciding what this is and whether it runs on their machine; the second wants exact steps. The opening paragraph serves the first, the steps sit below it.
+**Readme.** The opening paragraph answers what this is and whether it runs on the reader's machine. Exact steps sit below it.
 
 **Issue and pull request bodies.** Write what happened, what was expected, and the smallest input that shows both. Paste output rather than retyping it.
 
@@ -398,8 +425,6 @@ Eight habits, each removable without losing information:
 6. Text describing its own existence. Describe the effect instead.
 7. Three adjectives in a row.
 8. In Chinese, a closing cadence that reverses the sense (`不是…而是…`) and pairs kept only because they balance.
-
-What survives the cut has a subject, a verb and a value.
 
 ## Markdown bound for a repository
 
@@ -425,4 +450,4 @@ The `[[:space:]]*` in each pattern matters: a fenced block nested under a number
 
 A paragraph of Chinese carrying code spans can render with every span pushed to the paragraph's end, which reads as a sentence missing its nouns followed by a row of boxes. The server-side renderer places them correctly, so the browser lays out the line afterwards. On a device that does this, replace the spans with bold text or move the value into a fenced block, and read the page on the device that will display it.
 
-Two things the commands miss. A list whose items all begin with a noun has no subject, so give every item a subject and a verb. A byte count beside a download link goes stale the moment the file changes: run `wc -c`, paste the number, and recheck it in the commit that touches the file.
+Two things the commands miss: a list whose items all begin with a noun has no subject, and a byte count beside a download link goes stale the moment the file changes, so run `wc -c`, paste the number, and recheck it in the commit that touches the file.
