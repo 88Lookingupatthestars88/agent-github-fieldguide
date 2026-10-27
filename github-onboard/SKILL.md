@@ -1,89 +1,104 @@
 ---
 name: github-onboard
-description: Gets a user onto GitHub and leaves the agent holding a credential it has proven works. Use when the user wants to sign up for GitHub, sign in, create a personal access token or PAT, grant an agent access to a repository, or asks why GitHub returns unauthorized, bad credentials, 401, 403, 404, "could not read Username", or "Resource not accessible by personal access token". Covers MCP with OAuth, MCP with a PAT, plain REST, and git. Trigger on 注册 GitHub / 登录 GitHub / 建 token / 配置 GitHub 凭证 / token 怎么弄 / 让我能读你的仓库 / GitHub 连不上 / GitHub token setup / GitHub PAT / MCP unauthorized.
+description: Gets an agent from no credential to a token that has read a real repository. Covers sign-up, sign-in, two-factor enrolment, OAuth versus personal access token, MCP wiring, and the errors that follow a failed authentication. Reading and writing after that belong to github-operate. 注册 / 登录 / 两步验证 / 建 token / token 怎么弄 / GitHub 连不上 / 401 / unauthorized.
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.5"
+  version: "1.2.0"
+  source: https://github.com/88Lookingupatthestars88/agent-github-fieldguide
 ---
 
 # GitHub Onboarding
 
-The job ends when a credential has read the user's repository. Everything past that point belongs to an operation skill.
+Scope is one credential that reads a real repository. Everything after that is github-operate.
 
-Quoted lines below are prompt templates. Ask them in whatever language the user writes.
+## Step 0 — What you can run
 
-## Step 0 — What can you run here
-
-Three capabilities matter: shell commands, HTTP requests, file read and write. Fewer than three is workable, as long as the route around the missing one is real rather than assumed.
-
-If the harness hides its tools, say so and try once. Do not ask the user what environment they are in, because they usually cannot tell. Never claim a capability you have not exercised in this session.
+Three capabilities decide the route: shell, HTTP, file read and write. Check which exist before planning, and never claim one you have not used this session. Do not ask the user what environment they are in, because they usually cannot tell.
 
 ## Step 1 — Where the user stands
 
-Ask both questions in one message:
+Ask both in one message:
 
 > Do you already have a GitHub account?
-> If yes, which repository do you want me to reach? Give me the owner/name or the URL.
+> If yes, which repository should I reach? Owner/name or URL.
 
-Branches:
-
-- No account → Step 2.
-- Has account, names a repository → Step 3.
-- Has account, no repository yet → Step 3, then verify against the account instead of a repo (Step 4).
-- Has account, something worked before and now errors → get the exact error text first, then read Failures.
-- Answers vaguely → assume an account exists. Recovering one is quicker than creating a duplicate, and the later steps expose the truth anyway.
+- No account — Step 2 creates one, then 2.5, then 3.
+- Account already exists — Step 2 is a sign-in and nothing else, then 2.5, then 3. Nothing in Step 3 works without a session: a token cannot be issued and a repository cannot be created while signed out.
+- Account, and a repository is named — the same path, and Step 4 verifies against that repository.
+- Account, no repository yet — the same path, and Step 4 verifies against the account.
+- Something worked before and now errors — get the exact error text, then read Errors.
+- Vague answer — assume an account exists. Reading Errors settles it faster than a duplicate account does.
 
 ## Step 2 — Sign up or sign in
 
-Both happen in a browser and both are the user's to complete. Email verification, codes and human checks stay with them; when asked, say the verification step needs them and you will carry everything else.
+Both happen in a browser and both are the user's to finish. Email verification, codes and human checks stay with them. An existing account lands here for one reason only: to obtain a session. Everything in Step 3 needs that session, and nothing in Step 3 can substitute for it.
 
 New account: https://github.com/signup
 Existing account: https://github.com/login
 
-Password rules, field requirements and verification options change, and different accounts see different screens, so point at the page instead of reciting them. When the user is stuck, ask for the exact error line and work from that.
-
-Two failures worth naming once, because people hit them: the email address has to actually receive mail, and some providers drop GitHub's messages silently; a rejected password comes with a hint on the page, so read it before changing anything.
-
 Signed in is confirmed when https://github.com/settings/profile loads.
 
-Then settle one thing before touching credentials:
+Then settle scope before touching credentials:
 
-> Do you want me to be able to read your repositories, or also write to them?
+> Do you want me to read your repositories, or also write to them?
 
-Reading needs less, so default to read when the answer is unclear; widening later costs one edit.
+Default to read when the answer is unclear; widening later costs one edit.
+
+## Step 2.5 — The second factor
+
+Three jobs need two-factor authentication and fail without it: creating a repository, publishing a release, and issuing a token that carries write or administration. A session that only reads can proceed without it, and every other session does this step now.
+
+Read https://github.com/settings/security first. A filled row under Two-factor authentication means the account already has one and this step is done.
+
+Which methods appear there depends on the account. Passkeys need a platform authenticator, the mobile app needs push notifications that arrive, and SMS reaches only the countries listed at https://docs.github.com/en/authentication/securing-your-account-with-two-factor-authentication-2fa/countries-where-sms-authentication-is-supported. Look the user's country up before offering SMS, and move to a TOTP application when it is absent.
+
+Do not recommend a specific app. State the three properties that make one fit and let the user choose:
+
+- It implements RFC 6238, so a secret issued by GitHub produces the right code.
+- It exports a vault that restores on a new device.
+- It computes offline, with no account login.
+
+The device floor comes from the package's own `minSdkVersion`, not from a store page.
+
+Setup order:
+
+1. Scan the QR code, and copy the setup key printed below it.
+2. Enter the six-digit code from the app.
+3. Download the sixteen recovery codes. Each works once.
+4. Store them in two places that fail independently. A repository is not one of them, and neither is a chat transcript.
+
+The TOTP secret is a permanent second factor for the whole account. It stays out of the repository, out of commits and out of messages. When the agent has to produce codes unattended, treat the file like a token: outside any tree, readable by its owner alone.
+
+Enrolment is confirmed by https://github.com/settings/security showing the row filled in, not by the user reporting success.
 
 ## Step 3 — Connect
 
-Route before reading further, which keeps the simple cases short:
+Route before reading further:
 
-- User asks for a token, or already has one → 3.4.
-- User wants one-click authorization and the client is a first-party IDE or Cursor → 3.2.
-- User wants one-click but the client has no registered app → 3.1, then 3.3.
-- Task needs clone, push or history → 3.5, after the credential works.
+- User asks for a token, or already has one — 3.3.
+- User wants one-click authorization on a client that ships a GitHub app — 3.1, then 3.2.
+- Client has no registered app — 3.3.
+- The job needs clone, push or history — 3.5, after the credential works.
 
-### 3.1 Decide whether OAuth is possible at all
+### 3.1 Whether OAuth can finish here
 
-GitHub publishes no OAuth dynamic client registration, and three requests show it. The unauthenticated 401 from the endpoint carries `resource_metadata="https://api.githubcopilot.com/.well-known/oauth-protected-resource/mcp/"`. That document answers 200 and names `https://github.com/login/oauth` as its authorization server. That server's `/.well-known/oauth-authorization-server` answers 404, so there is no `registration_endpoint` and a client has nowhere to register itself. OAuth therefore completes only when the client already ships a registered GitHub OAuth app.
+GitHub runs no dynamic client registration, so a client can only complete OAuth if it already ships a registered GitHub app. Two signals separate the clients, and both are visible without the user's help:
 
-Two signals separate the two kinds of client, and both are visible without the user's help:
+- A built-in GitHub MCP entry, or a one-click GitHub install. An app exists.
+- A prompt for client ID, client secret or callback URL. No app exists, so OAuth cannot finish.
 
-- The client lists GitHub as a built-in MCP server, or offers a one-click GitHub install. A registered app exists, so OAuth completes.
-- Adding the server makes the client ask for a client ID, a client secret or a callback URL. No app exists, so OAuth cannot finish.
+With neither signal, have the user add the server and report what appeared. A consent screen means the app exists; a form demanding a client ID means it does not. This step is reported by the user, not clicked by the agent.
 
-With neither signal visible, have the user add the server and attempt the authorization, then describe what appeared. A GitHub consent screen means the app exists; a form demanding a client ID means it does not. This step cannot be clicked through by the agent, only reported by the user.
+VS Code 1.101 and later, Visual Studio, JetBrains, Eclipse and Cursor ship one. Generic remote-MCP connectors, self-hosted clients and mobile apps ship none, and take a token instead.
 
-VS Code 1.101 and later, Visual Studio, JetBrains, Eclipse and Cursor ship one. GitHub states the requirement in its own README: every host application has to configure a GitHub App or an OAuth App of its own. Generic remote-MCP connector UIs, self-hosted clients and mobile apps ship none, and for those the PAT route is the one that works.
+An OAuth credential lives inside the client afterwards. MCP tool calls can use it and a shell cannot, so an agent that also calls REST or runs git needs its own token even after OAuth succeeds.
 
-A user who refuses a token and runs a client with no registered app has two doors and no third: either the client supports OAuth through a pre-registered app, or something has to carry a credential. Offer the shortest token path rather than leaving the refusal hanging.
-
-OAuth costs a click and grants the scopes the server challenges for, which that metadata document lists — `repo`, `read:org`, `read:user`, `user:email`, `read:packages`, `write:packages`, `read:project`, `project`, `gist`, `notifications` — and `repo` alone reaches every repository the account can. A fine-grained PAT costs about two minutes and can be pinned to named repositories and named permissions. Take OAuth when the user wants speed on their own machine and a PAT when they want the reach limited, then say which one in a clause.
-
-An OAuth credential lives inside the MCP client afterwards. MCP tool calls can use it and a shell command on the machine cannot, so an agent that will also call the REST API or run git needs its own PAT even after OAuth succeeds.
+A fine-grained token pins the reach to named repositories and named permissions and costs about two minutes. Take OAuth for speed on the user's own machine, and a token when the reach has to be limited.
 
 ### 3.2 MCP over OAuth
 
-The remote endpoint is `https://api.githubcopilot.com/mcp/`, verified 2026-10. Confirm it answers before wiring anything:
+The remote endpoint is `https://api.githubcopilot.com/mcp/`. Confirm it answers before wiring anything:
 
 ```sh
 ENDPOINT=https://api.githubcopilot.com/mcp/
@@ -93,30 +108,24 @@ curl -s -D - -o /dev/null -X POST "$ENDPOINT" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
 ```
 
-A 401 carrying a `www-authenticate` header is the healthy answer: the header names the flow and links a metadata document listing the scopes and bearer methods it accepts, and that document outranks this file. A 404 means the path moved, and https://github.com/github/github-mcp-server carries the current one. Narrower tool surfaces live under the same path, `/mcp/x/repos` for repository tools only being one. `000` means the host is unreachable from here.
+A 401 carrying a `www-authenticate` header is the healthy answer, and the metadata document it links outranks this file. A 404 means the path moved; https://github.com/github/github-mcp-server carries the current one. Narrower tool surfaces live under the same path, with `/mcp/x/repos` for repository tools only. `000` means the host is unreachable from here.
 
-The body of that 401 is a diagnosis. Four inputs produce four distinct answers, measured 2026-10:
+The body of that 401 separates four cases that two status codes cannot:
 
 ```
-no Authorization header      401  bad request: missing required Authorization header
-                                  www-authenticate: error="invalid_request",
-                                    error_description="No access token was provided in this request"
-empty "Bearer " value        400  bad request: Authorization header is badly formatted
-                                  www-authenticate: error="invalid_token",
-                                    error_description="Invalid token"
-wrong or expired token       401  unauthorized: token authentication failed
-                                  www-authenticate: error="invalid_token",
-                                    error_description="Token is not authorized"
-non-Bearer scheme            400  bad request: Authorization header is badly formatted
+no Authorization header   401  bad request: missing required Authorization header
+empty "Bearer " value     400  bad request: Authorization header is badly formatted
+wrong or expired token    401  unauthorized: token authentication failed
+non-Bearer scheme         400  bad request: Authorization header is badly formatted
 ```
 
-The two middle cases share a status code and separate by body text. `token authentication failed` means a token arrived and the server rejected it: expired, revoked, or a type this endpoint does not accept. `missing required Authorization header` means nothing arrived, which is a client wiring problem; no token takes part in that request, so reissuing one changes nothing. `/_ping` returns 401 without the same header and makes a poor liveness check.
+`token authentication failed` means a token arrived and the server refused it. `missing required Authorization header` means nothing arrived, so the client is not attaching one and reissuing changes nothing.
 
 Then the client runs the flow and the agent confirms the result.
 
 ### 3.3 MCP over a PAT
 
-Same endpoint as 3.2, with the credential in a header:
+Same endpoint, credential in a header:
 
 ```json
 {
@@ -130,90 +139,77 @@ Same endpoint as 3.2, with the credential in a header:
 }
 ```
 
-A client that accepts only commands takes the local Docker variant, whose `docker run` line sits in the README at https://github.com/github/github-mcp-server. It needs a running Docker daemon and takes a PAT rather than OAuth.
+A client that accepts only commands takes the local Docker variant documented at https://github.com/github/github-mcp-server. It needs a running Docker daemon and a token.
 
 Three signals together mean the connection is real: HTTP 200, an `mcp-session-id` response header, and `serverInfo` in the body. A client reporting "connected" without all three is not connected.
 
 ### 3.4 REST over a PAT
 
-This is the route that works when the user wants a token, when MCP is unavailable, or when the agent has to act from a shell rather than from inside a client.
-
-Making a token:
+This is the route when the user wants a token, when MCP is unavailable, or when the agent has to act from a shell.
 
 - https://github.com/settings/personal-access-tokens/new — fine-grained, the default
-- https://github.com/settings/tokens/new — classic; `repo` covers every private repository in full
+- https://github.com/settings/tokens/new — classic, where `repo` covers every private repository in full
 
-Six jobs have no fine-grained equivalent, so no permission unlocks them and the token type has to change: writing to a public repository the account is not a member of, acting as an outside collaborator or a repository collaborator, reaching more than one organization with a single token, Packages, the Checks API, and a Project owned by a user account.
+Six operations have no fine-grained equivalent, so no permission unlocks them and the token type has to change: writing to a public repository the account is not a member of, acting as an outside collaborator, reaching more than one organization with one token, Packages, the Checks API, and a project owned by a user account.
 
-Four things people expect on that list are absent. Fine-grained tokens carry `gists`, `notifications`, `profile` and `keys` permissions, so a Gist, a notification, a profile edit and an SSH key all work without switching to classic.
+Grant by task, never by convenience: contents and issues for reading, pull requests when PRs are in scope, actions and workflows for CI, administration only when repository settings have to change. Administration carries deletion with it.
 
-Grant by task rather than by convenience: contents and issues for reading, pull requests only if PRs are in scope, actions and workflows for CI, administration only when repository settings have to change. Administration carries deletion with it, so name that cost once and let the user decide.
-
-Permission names drift, so check https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens rather than trusting a list here.
-
-Confirming the token works:
+Permission names drift. Check https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens rather than a list here.
 
 ```sh
 curl -sS -H "Authorization: Bearer $TOKEN" https://api.github.com/user
 ```
 
-A login name in the response proves the credential, and `gh api user --jq .login` answers the same question where `gh` exists. Use `gh api user` rather than `gh auth status`: the status command contacts `github.com`, so a blocked web host makes it fail while `api.github.com` works perfectly.
-
-When a call comes back `403 Resource not accessible by personal access token`, the message covers four states: a permission never ticked, one left at read where the call writes, a repository missing from the token's selection, and an organization that has not approved the token. Every REST response carries `x-accepted-github-permissions`, naming the permission and level the endpoint checks — `contents=write`, `administration=read`, `secrets=read`.
-
-- Header names a permission the token holds → the permission is not the problem. `GET /repos/<owner>/<repo>` answering 404 while `GET /user` answers 200 means the repository is not in the selection. A 200 on an organization's repository with the call still refused means approval is pending, and an owner clears it at `https://github.com/organizations/<org>/settings/personal-access-tokens`.
-- Header names a permission the token lacks, or a level higher than the one granted → add it or raise it. Settings that look complete usually mean read was ticked where write was needed.
-- No permission covers the operation at all → one of the six above, so change the token type.
-- Header reads `allows_permissionless_access=true` → the endpoint needs no permission, whatever the body says.
-
-Reissuing with the same settings fixes neither of the first two.
-
-An organization behind SAML needs one more authorization after the token exists, taken on the organization's SSO page. The tell is a 403 on organization repositories with `X-GitHub-SSO` in the headers, on a token whose scopes look correct.
+A login name in the response proves the credential. `gh api user --jq .login` answers the same question and is safer than `gh auth status`, which contacts `github.com` and fails where only `api.github.com` is reachable.
 
 ### 3.5 git
 
-Only for clone, push or history. Keep the token out of the clone URL, where it lands in `.git/config` and shell history and costs more to scrub than a new token costs to issue; use a credential helper instead.
+Only for clone, push or history. Keep the token out of the clone URL, where it lands in `.git/config` and shell history; use a credential helper.
 
-One failure gets misread as an auth problem:
+One failure reads as an auth problem and is not:
 
 ```
 fatal: could not read Username for 'https://<host>'
 ```
 
-Usually the machine rewrites `github.com` to a mirror that does not forward private-repo credentials, so check the git config for `insteadOf` rules before blaming the token. Under that configuration public clones succeed and private clones fail.
-
-SSH needs a public key uploaded through the web UI, which rarely fits unattended use.
+Usually the machine rewrites `github.com` to a mirror that does not forward private-repo credentials. Check the git config for `insteadOf` rules before blaming the token. Under that configuration public clones succeed and private clones fail.
 
 ## Step 4 — Prove it reads the repository
 
-A valid token does not prove it reaches the target, so make one read against the repository itself using the transport just configured.
-
-Over REST, a 200 is the proof:
+A valid token does not prove reach. Make one read against the target using the transport just configured.
 
 ```sh
 curl -sS -H "Authorization: Bearer $TOKEN" https://api.github.com/repos/<owner>/<repo>
 ```
 
-Over MCP, call one read-only tool against the same target. `get_me` proves the account on most builds, and the exact tool names come from `tools/list` rather than from this file. A JSON-RPC error frame is a failure even when the connection reports healthy, because there is no HTTP status at this layer.
+A 200 is the proof. Over MCP, call one read-only tool against the same target and take tool names from `tools/list`; a JSON-RPC error frame is a failure even when the connection reports healthy.
 
-A 404 is ambiguous on either route: GitHub answers 404 instead of 403 when a credential lacks access, so a missing repository and an unscoped token look identical. Recheck the token's repository selection before telling anyone the repository does not exist.
+A 404 is ambiguous on either route, because GitHub answers 404 instead of 403 when a credential lacks access. Recheck the token's repository selection before telling anyone the repository does not exist.
 
-With no repository yet, read `https://api.github.com/user/repos` and accept 200 with an empty array as proof the credential works, then stop.
+With no repository on the account, read `https://api.github.com/user/repos` and accept 200 with an empty array as proof the credential works.
 
-Read `github-authentication-token-expiration` from the response headers: on a fine-grained or OAuth token it carries the expiry in UTC, and its absence on a classic token means no expiry was set. A new token can take a few seconds to propagate, so retry a 401 once before calling it dead.
+Read `github-authentication-token-expiration` from the response headers. On a fine-grained or OAuth token it carries the expiry in UTC; on a classic token its absence means no expiry was set. A new token can take a few seconds to propagate, so retry a 401 once before calling it dead.
 
-## Failures
+## Errors
+
+Authentication failures only. Permission and object failures belong to github-operate Step 11.
 
 - `401 Bad credentials` — mistyped, revoked or expired. Issue a new one.
-- `403 Resource not accessible by personal access token` — one message for four causes: no permission ticked, the permission set to read where the call writes, the repository absent from the token's selection, or an organization that has not approved the token. Read `x-accepted-github-permissions` first, since it names the permission and the level; 3.4 has the branches.
-- `403` with `X-GitHub-SSO` — the organization has not authorized this token yet.
-- `404` on a repository that exists — no access. See Step 4.
-- `unauthorized: token authentication failed` — a token reached the server and was refused: expired, revoked, or a type this endpoint does not accept. Check the expiry date first, then whether the token is fine-grained or an installation token. A missing header is a different failure, and reissuing helps only when the token itself is the problem.
-- `bad request: missing required Authorization header` — no credential was sent. The client did not attach the header, often because it is still trying to finish OAuth with no registered app behind it. Look at the outgoing request; with no `Authorization` header there, nothing on the token side adds one. Switch the client to PAT-in-header mode (3.3) or move to REST (3.4).
-- `bad request: Authorization header is badly formatted` — an empty bearer value or a scheme other than `Bearer`. The token may be valid and the header around it is not.
-- `API rate limit exceeded` — `X-RateLimit-Reset` carries the reset timestamp.
+- `unauthorized: token authentication failed` — a token reached the server and was refused. Check the expiry date, then the token type. Reissuing helps only when the token itself is the problem.
+- `bad request: missing required Authorization header` — no credential was sent. The client is not attaching the header, often because it is still attempting OAuth with no registered app behind it. Switch to 3.3 or 3.4.
+- `bad request: Authorization header is badly formatted` — an empty bearer value, or a scheme other than `Bearer`.
+- Settings pages answering the 2FA gate instead of the form — the deadline passed with no second factor enrolled. No token clears it. An existing token keeps working; editing one does not, because the settings page sits behind the gate.
 - `dial tcp ... i/o timeout` — network layer. Raise the timeout or change transport.
-- `RPC failed` / `GitRPC::BadObjectState` — server side and transient. Retry with backoff, four attempts.
+
+## Is this copy current
+
+`metadata.version` above is the release this copy shipped with, the tag without its `v`, and `metadata.source` is where it came from. The newest release answers one call:
+
+```sh
+gh api repos/88Lookingupatthestars88/agent-github-fieldguide/releases/latest --jq '.tag_name, .published_at'
+```
+
+A tag above that number means the installed copy is older than what shipped. Report both numbers and let the user decide, because replacing the file is their edit.
 
 ## Handoff
 
@@ -221,9 +217,7 @@ Three lines:
 
 1. State, for example "reads and writes, via REST".
 2. Next action: one command or one click.
-3. Dead ends hit, if any, for example "client would not send a bearer token, fell back to REST". Skip this line when the path was clean.
-
-These three lines are for the person who asked. Nothing here belongs on a release page or in a readme; github-operate covers that kind of writing.
+3. Dead ends hit, if any. Skip this line when the path was clean.
 
 ## Credential hygiene
 
@@ -233,7 +227,7 @@ Store a token in a file only its owner can read:
 umask 077 && printf '%s' "$TOKEN" > ~/.gh_token
 ```
 
-On a platform without `umask`, restrict the file through the OS interface instead; what matters is that no other account can read it.
+On a platform without `umask`, restrict the file through the OS interface. What matters is that no other account can read it.
 
 Reference the path afterwards. Do not echo the value, print its length, commit it, or put it in a URL.
 

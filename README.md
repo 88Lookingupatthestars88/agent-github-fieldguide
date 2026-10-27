@@ -6,9 +6,9 @@
 
 ## 下载
 
-- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.1.0/github-onboard-SKILL.md) — 17431 B
-- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.1.0/github-operate-SKILL.md) — 32237 B
-- [agent-github-fieldguide-v1.1.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.1.0/agent-github-fieldguide-v1.1.0.zip) — 24715 B，两个 skill 连文件夹打包
+- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/github-onboard-SKILL.md) — 13299 B
+- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/github-operate-SKILL.md) — 29475 B
+- [agent-github-fieldguide-v1.2.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/agent-github-fieldguide-v1.2.0.zip) — 22335 B，两个 skill 连文件夹打包
 
 ## 装
 
@@ -41,6 +41,7 @@ cp -r agent-github-fieldguide/github-operate ~/.claude/skills/
 
 - 没账号：去 https://github.com/signup 注册，被拒的那一栏按页面提示改。
 - 有账号：去 https://github.com/login 登录。登没登上，看 https://github.com/settings/profile 能不能打开。
+- 两步验证排在需要它的活儿前面：建仓库、发 release、签带写权限或管理权限的 token，这三件事之前先开。哪些方式能开由账号所在的地方决定，短信只发到一张公布的国家名单上，skill 会先查那张表再开口。它不推荐具体 app，只给三条判断标准，选哪个由人定。
 - 能不能走 OAuth，看客户端有没有自带注册好的 GitHub App。VS Code 1.101 起、Visual Studio、JetBrains、Eclipse、Cursor 都自带；通用 MCP 连接器没有，只能建 token。原因在 GitHub 那边：它没有动态客户端注册，客户端没法登记自己。
 - 走不了 OAuth 就建 fine-grained token。勾哪个权限由任务定，有六件事任何权限都盖不住，只能换 classic token。
 - 四条通道：MCP 走 OAuth、MCP 在请求头里带 token、纯 REST、要 clone 或 push 时走 git。
@@ -56,6 +57,9 @@ cp -r agent-github-fieldguide/github-operate ~/.claude/skills/
 - 分支、PR、Issue、workflow、Release 都管。三种合并方式各留下什么，动手前会讲。Release 附件是独立对象，移动 tag 不会带着它走。
 - 删除之前先给一份编号清单，每项写清会带走什么，再说明清单之外还有什么。拿到明确确认才动手，一次一项。删仓库、删分支、删文件、删本地目录各算各的。
 - 仓库设置也管：description、homepage、topics、Discussions 开关。改 topics 得走 PUT，PATCH 返回 200 但一个字段都不改。
+- 社区健康分单列一步：四次跳变各加了什么，哪两项的路径比名字窄，Pages 站点怎么补最后一格。
+- 审核一步读十一个接口，报告哪些是关的：提交里有没有留凭据、许可证到底带的哪一份、Actions 有没有钉到 SHA、workflow token 能干什么、默认分支有没有保护、陌生人能不能私下报漏洞、依赖告警到不到、Pages 对外发的是什么、有没有没人记得的 deploy key 和 webhook、token 铺得比活儿宽多少。
+- 升版本是一次调用，后面不挂删除。旧版留在 Release 页上照样能下，本地也不在树旁边再存一份，发过的版本要用就去 Release 页取。
 
 ## 两个一起用
 

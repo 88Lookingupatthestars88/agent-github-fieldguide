@@ -6,9 +6,9 @@ Two Agent Skills that let an agent work GitHub on its own. `github-onboard` hand
 
 ## Download
 
-- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.1.0/github-onboard-SKILL.md) — 17431 B
-- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.1.0/github-operate-SKILL.md) — 32237 B
-- [agent-github-fieldguide-v1.1.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.1.0/agent-github-fieldguide-v1.1.0.zip) — 24715 B, both skills with their folders
+- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/github-onboard-SKILL.md) — 13299 B
+- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/github-operate-SKILL.md) — 29475 B
+- [agent-github-fieldguide-v1.2.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/agent-github-fieldguide-v1.2.0.zip) — 22335 B, both skills with their folders
 
 ## Install
 
@@ -41,6 +41,7 @@ Use it when no working credential exists yet. The job ends at a real repository 
 
 - No account: sign up at https://github.com/signup and correct whatever the page rejects.
 - Already have one: sign in at https://github.com/login. Sign-in worked if https://github.com/settings/profile opens.
+- Two-factor authentication comes before any of the work that needs it: creating a repository, publishing a release, or issuing a token with write or administration. Which methods the account is offered depends on where it is — text messages go only to a published list of countries — and the skill reads that list before suggesting one. It does not recommend an authenticator app; it states the three properties that make one fit and lets the user pick.
 - Whether OAuth can finish depends on the client shipping a registered GitHub app. VS Code 1.101 and later, Visual Studio, JetBrains, Eclipse and Cursor do; a generic MCP connector does not, and takes a token instead. The cause sits on GitHub's side: no dynamic client registration, so a client has nowhere to register itself.
 - Without OAuth it builds a fine-grained token: the permission follows the task, and six operations have no fine-grained permission at all, so those need a classic token.
 - Four transports: MCP over OAuth, MCP with a token in a header, plain REST, and git for clone or push.
@@ -56,6 +57,9 @@ Use it once the credential works and something has to change.
 - Branches, pull requests, issues, workflow runs and releases are covered. What each merge method leaves behind is stated before one is chosen, and release assets are separate objects that a moved tag does not carry.
 - Deletion starts with a numbered list naming what each item takes down and what the list leaves out. It runs only after an explicit confirmation, one item at a time, and a repository, a branch, a file and a local directory are four separate confirmations.
 - Repository settings are covered too: description, homepage, topics, the Discussions switch. Topics go through PUT, because PATCH answers 200 without changing a single field.
+- The community profile has its own step: what each of the four scored additions is, which two of them clear on a narrower path than their names suggest, and how a Pages site fills the last field.
+- An audit step reads eleven endpoints and reports what is off — committed credentials, a missing licence, unpinned actions, workflow token scope, branch protection, private vulnerability reporting, dependency alerts, Pages visibility, deploy keys and webhooks, and how far the token itself reaches.
+- A version bump is one call. Old releases stay downloadable, and no version directory is written beside the tree, because the released copy already lives on its release page.
 
 ## Using both
 
