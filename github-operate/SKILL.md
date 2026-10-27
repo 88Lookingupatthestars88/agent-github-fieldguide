@@ -4,7 +4,7 @@ description: Operates on a GitHub repository once a credential works. Covers rea
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.2.0"
+  version: "1.2.1"
   source: https://github.com/88Lookingupatthestars88/agent-github-fieldguide
 ---
 
@@ -252,9 +252,9 @@ An issue template is a file in the tree, so Step 3 or Step 4 writes it. Where it
 
 ## Step 9.6 — The community profile
 
-`GET /repos/<owner>/<repo>/community/profile` is the checklist behind the Community Standards panel. `health_percentage` is the number shown, and every entry under `files` is a URL or `null`. The nulls are the work left.
+`GET /repos/<owner>/<repo>/community/profile` backs the Community Standards panel. `health_percentage` is the number that panel shows, and each entry under `files` holds a URL or `null`. The `null` entries are the files still missing.
 
-| Missing file | Where it goes |
+| Field | File that clears it |
 |---|---|
 | `readme` | `README.md` |
 | `license` | `LICENSE` |
@@ -264,23 +264,21 @@ An issue template is a file in the tree, so Step 3 or Step 4 writes it. Where it
 | `pull_request_template` | `.github/PULL_REQUEST_TEMPLATE.md` |
 | `documentation` | a wiki page, or a Pages site |
 
-GitHub's help page describes four items at twenty-five points each. The returned number does not move in quarters of that, so read the field instead of computing a score.
+GitHub's help page gives four items at twenty-five points each. The number that comes back does not divide by four, so read `files` rather than working the score out.
 
-Two entries clear on a narrower path than their names suggest.
+`issue_template` takes one file at `.github/ISSUE_TEMPLATE.md`. A form at `.github/ISSUE_TEMPLATE/report.yml` with a `config.yml` beside it gives a working chooser and leaves that field `null`, so write the `null`-clearing file as well.
 
-`issue_template` wants one file at `.github/ISSUE_TEMPLATE.md`. A form at `.github/ISSUE_TEMPLATE/report.yml` with a `config.yml` beside it produces a working chooser and leaves the field null. Keeping both costs nothing and the chooser keeps working.
-
-`documentation` wants a wiki page or a Pages site. Setting `has_wiki` true on its own leaves the field null.
+`documentation` takes a wiki page or a Pages site. `has_wiki: true` on its own leaves the field `null`.
 
 ```sh
 gh api -X POST repos/<owner>/<repo>/pages -f 'source[branch]=main' -f 'source[path]=/'
 ```
 
-Pages publishes the whole branch and Jekyll renders `README.md` as the index. `documentation` fills on the next read; `health_percentage` lags several minutes, so an immediate read still shows the previous number.
+Pages publishes the whole branch and Jekyll renders `README.md` as the index. `documentation` fills on the next read. `health_percentage` lags several minutes, so a read taken straight after still returns the old number.
 
 A build failing with `Page build failed`, `duration: 0` and a 500 on the deployment is the deployment service rather than the content, and the next push retries it.
 
-The percentage counts files, not what is in them.
+The percentage counts files. A `CONTRIBUTING.md` with no build steps in it scores the same as one that has them.
 
 ## Step 9.7 — Auditing a repository
 

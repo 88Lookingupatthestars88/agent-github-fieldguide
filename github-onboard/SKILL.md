@@ -4,7 +4,7 @@ description: Gets an agent from no credential to a token that has read a real re
 license: Apache-2.0
 metadata:
   author: 88Lookingupatthestars88
-  version: "1.2.0"
+  version: "1.2.1"
   source: https://github.com/88Lookingupatthestars88/agent-github-fieldguide
 ---
 

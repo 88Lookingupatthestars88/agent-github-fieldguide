@@ -1,18 +1,20 @@
 # Conduct
 
-## Reporting a failure
+This repository is two text files and the notes behind them. Nothing here is a support contract.
 
-Paste the error text instead of a screenshot of a dialog. The wording is what identifies which failure it is.
+## Reporting a problem
 
-Say which client you were in and which step you were on.
+Paste the error text rather than a screenshot of a dialog. The wording is what says which failure it is.
+
+Add the client you were in, the step you were on, and what the command printed.
 
 ## What gets closed
 
-- An issue with a token, a key or a password in it. That credential is compromised the moment it is posted, so revoke it first and open a new issue without it.
-- A request to add a step, with nothing said about what failed when you tried the step that already covers it.
+- An issue containing a token, a key or a password. Revoke the credential first, then open a new issue without the value in it.
+- A request to add a step that does not say what failed when the step already covering it was tried.
 
 ## Disagreeing
 
-Quote the sentence you think is wrong and write the one that should replace it. I will take that over a paragraph about the writing in general.
+Quote the sentence you think is wrong and write the replacement. A comment about the writing in general gives nothing to act on.
 
-Removal of a comment or a block takes a one-line reason in the thread.
+When you delete a comment or a block of text, say why in one line.

@@ -6,9 +6,9 @@ Two Agent Skills that let an agent work GitHub on its own. `github-onboard` hand
 
 ## Download
 
-- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/github-onboard-SKILL.md) — 13299 B
-- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/github-operate-SKILL.md) — 29475 B
-- [agent-github-fieldguide-v1.2.0.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.0/agent-github-fieldguide-v1.2.0.zip) — 22335 B, both skills with their folders
+- [github-onboard-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.1/github-onboard-SKILL.md) — 13299 B
+- [github-operate-SKILL.md](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.1/github-operate-SKILL.md) — 29470 B
+- [agent-github-fieldguide-v1.2.1.zip](https://github.com/88Lookingupatthestars88/agent-github-fieldguide/releases/download/v1.2.1/agent-github-fieldguide-v1.2.1.zip) — 22327 B, both skills with their folders
 
 ## Install
 
